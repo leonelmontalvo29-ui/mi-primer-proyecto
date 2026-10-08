@@ -1,0 +1,357 @@
+style
+   { box-sizing border-box; margin 0; padding 0; }
+  body { font-family 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background #f4f5f7; color #1a1a1a; }
+
+   Header 
+  .app-header {
+    background var(--primario); color #fff; display flex; align-items center; gap 16px;
+    padding 14px 24px; box-shadow 0 2px 6px rgba(0,0,0,.15);
+  }
+  .logo-img { height 48px; width auto; display block; }
+  .logo-placeholder {
+    height 48px; min-width 120px; display flex; align-items center; justify-content center;
+    padding 0 16px; border 2px dashed rgba(255,255,255,.7); border-radius 6px;
+    font-weight 700; letter-spacing 1px; font-size 13px;
+  }
+  .titulos h1 { font-size 18px; line-height 1.2; }
+  .titulos small { opacity .85; font-size 12px; }
+
+   Tabs 
+  .tabs { display flex; gap 4px; background #fff; padding 0 24px; border-bottom 1px solid #e3e6ea; flex-wrap wrap; }
+  .tab-btn {
+    background none; border none; cursor pointer; padding 14px 18px;
+    font-size 14px; font-weight 600; color #6b7280; border-bottom 3px solid transparent;
+  }
+  .tab-btnhover { color var(--primario); }
+  .tab-btn.active { color var(--primario); border-bottom-color var(--secundario); }
+
+   Layout 
+  main { max-width 1100px; margin 28px auto; padding 0 24px; }
+  .tab-panel { display none; }
+  .tab-panel.activo { display block; }
+  .toolbar { display flex; align-items center; justify-content space-between; margin-bottom 16px; }
+  .toolbar h2 { color var(--primario); font-size 20px; }
+
+   Botones 
+  .btn { cursor pointer; border none; border-radius 6px; padding 9px 16px; font-size 13px; font-weight 600; }
+  .btn-primary { background var(--primario); color #fff; }
+  .btn-primaryhover { filter brightness(1.12); }
+  .btn-primarydisabled { opacity .6; cursor default; }
+  .btn-ghost { background #eef0f3; color #374151; }
+  .btn-ghosthover { background #e2e6ea; }
+  .btn-sm { padding 5px 10px; font-size 12px; }
+  .btn-warn { background #fbe9e7; color #b3261e; }
+  .btn-warnhover { background #f6d6d2; }
+
+   Tablas 
+  .tabla-wrap { background #fff; border-radius 10px; overflow hidden; box-shadow 0 1px 4px rgba(0,0,0,.08); }
+  table { width 100%; border-collapse collapse; }
+  thead th {
+    background var(--primario); color #fff; text-align left; padding 12px 14px;
+    font-size 12px; text-transform uppercase; letter-spacing .5px;
+  }
+  tbody td { padding 11px 14px; border-bottom 1px solid #eef0f3; font-size 14px; }
+  tbody trhover { background #f8fafc; }
+  .cargando, .vacio { text-align center; color #9aa0a6; padding 24px; font-style italic; }
+
+   Estado badges 
+  .estado { display inline-block; padding 3px 10px; border-radius 999px; font-size 12px; font-weight 600; }
+  .estado-activo { background #e6f4ea; color #137333; }
+  .estado-inactivo { background #f1f3f4; color #5f6368; }
+  .acciones { display flex; gap 6px; }
+
+   Encabezado de grupo (personalidades por crédito) 
+  .grupo-credito td {
+    background #eef3fb; color var(--primario); font-weight 700; font-size 13px;
+    text-transform uppercase; letter-spacing .4px; padding 9px 14px;
+  }
+
+   Buscadores en tablas 
+  .buscador-wrap { margin 0 0 12px 0; }
+  .buscador {
+    width 100%; max-width 360px; padding 9px 12px; border 1px solid #cbd2d9;
+    border-radius 8px; font-size 14px; font-family inherit;
+  }
+  .buscadorfocus { outline none; border-color var(--primario); box-shadow 0 0 0 3px rgba(31,56,100,.12); }
+  .ck-selectores .buscador { max-width 260px; align-self flex-end; }
+
+   Modal 
+  .modal-overlay {
+    display none; position fixed; inset 0; background rgba(0,0,0,.45);
+    align-items center; justify-content center; padding 20px; z-index 100;
+  }
+  .modal-overlay.abierto { display flex; }
+  .modal {
+    background #fff; border-radius 12px; padding 24px; width 100%; max-width 440px;
+    box-shadow 0 12px 40px rgba(0,0,0,.25);
+  }
+  .modal h3 { color var(--primario); margin-bottom 18px; }
+  .modal label { display block; font-size 13px; font-weight 600; color #374151; margin-bottom 14px; }
+  .modal input, .modal select {
+    width 100%; margin-top 6px; padding 9px 11px; border 1px solid #cbd2d9;
+    border-radius 6px; font-size 14px; font-family inherit;
+  }
+  .modal inputfocus, .modal selectfocus { outline none; border-color var(--primario); }
+  .nota { font-size 12px; color #6b7280; background #f4f6f8; padding 9px 11px; border-radius 6px; margin-bottom 16px; }
+  .modal-acciones { display flex; justify-content flex-end; gap 10px; margin-top 4px; }
+
+   Toast 
+  .toast {
+    position fixed; bottom 24px; left 50%; transform translateX(-50%) translateY(20px);
+    background #323232; color #fff; padding 12px 20px; border-radius 8px; font-size 14px;
+    opacity 0; pointer-events none; transition all .25s; z-index 200; max-width 90%; text-align center;
+  }
+  .toast.visible { opacity 1; transform translateX(-50%) translateY(0); }
+  .toast.error { background #b3261e; }
+
+   ===================================================== 
+   MÓDULO 3 — CHECKLIST                                    
+   ===================================================== 
+  .ck-selectores { display flex; gap 16px; flex-wrap wrap; margin-bottom 18px; align-items flex-end; }
+  .ck-selectores label { font-size 13px; font-weight 600; color #374151; }
+  .ck-selectores select {
+    display block; margin-top 6px; min-width 280px; padding 9px 11px;
+    border 1px solid #cbd2d9; border-radius 6px; font-size 14px; font-family inherit; background #fff;
+  }
+  .ck-selectores selectdisabled { background #f1f3f4; color #9aa0a6; }
+  .ck-btn-reporte { white-space nowrap; }
+
+  .ck-guardado { font-size 12px; font-weight 600; }
+  .ck-guardado.guardando { color #b07d00; }
+  .ck-guardado.ok { color #137333; }
+
+   Progreso 
+  .ck-progreso { background #fff; border-radius 10px; padding 18px 20px; box-shadow 0 1px 4px rgba(0,0,0,.08); margin-bottom 18px; }
+  .ck-prog-top { display flex; align-items baseline; justify-content space-between; margin-bottom 10px; flex-wrap wrap; gap 6px; }
+  .ck-prog-pct { font-size 22px; font-weight 700; color var(--primario); }
+  .ck-prog-total { font-size 13px; color #6b7280; }
+  .ck-prog-bar { display flex; height 14px; border-radius 999px; overflow hidden; background #eef0f3; }
+  .ck-prog-bar .seg { height 100%; transition width .3s; }
+  .seg-entregado { background #34a853; }
+  .seg-noaplica  { background #9aa0a6; }
+  .seg-vencido   { background #ea4335; }
+  .seg-pendiente { background #dfe3e8; }
+  .ck-prog-stats { display flex; flex-wrap wrap; gap 8px; margin-top 12px; }
+  .chip { font-size 12px; font-weight 600; padding 4px 10px; border-radius 999px; }
+  .chip-entregado { background #e6f4ea; color #137333; }
+  .chip-pendiente { background #f1f3f4; color #5f6368; }
+  .chip-vencido   { background #fce8e6; color #c5221f; }
+  .chip-noaplica  { background #e8eaed; color #3c4043; }
+  .chip-total     { background #e8f0fe; color #1a3a8f; }
+
+   Acordeón de categorías 
+  .ck-cat { background #fff; border-radius 10px; box-shadow 0 1px 4px rgba(0,0,0,.08); margin-bottom 12px; overflow hidden; }
+  .ck-cat-header {
+    width 100%; display flex; align-items center; gap 10px; cursor pointer; text-align left;
+    background #f7f9fc; border none; padding 13px 16px; font-size 14px; font-weight 700; color var(--primario);
+    border-bottom 1px solid #eef0f3;
+  }
+  .ck-cat-headerhover { background #eef3fb; }
+  .ck-cat-arrow { transition transform .2s; font-size 12px; }
+  .ck-cat.cerrado .ck-cat-arrow { transform rotate(-90deg); }
+  .ck-cat.cerrado .ck-cat-body { display none; }
+  .ck-cat-nombre { flex 1; }
+  .ck-cat-count { font-size 12px; font-weight 600; color #6b7280; background #fff; padding 2px 10px; border-radius 999px; border 1px solid #e3e6ea; }
+  .ck-cat-body { overflow-x auto; }
+   Etiqueta de crédito heredado (progreso compartido de personalidades) 
+  .ck-cat.ck-cat-credito .ck-cat-header { background #fdf8ec; color #8a6d00; border-left 4px solid var(--secundario); }
+  .ck-cat.ck-cat-credito .ck-cat-headerhover { background #f9efd6; }
+
+   Tabla del checklist 
+  .ck-tabla { width 100%; border-collapse collapse; min-width 940px; }
+  .ck-tabla thead th {
+    background #fafbfc; color #5f6368; text-transform none; letter-spacing 0; font-size 11px;
+    padding 9px 12px; border-bottom 1px solid #eef0f3; text-align left;
+  }
+  .ck-tabla td { padding 9px 12px; border-bottom 1px solid #f0f2f4; font-size 13px; vertical-align middle; }
+  .ck-doc { font-weight 600; color #1f2937; max-width 320px; }
+  .ck-oblig { color #c5221f; font-weight 700; }
+  .ck-na { color #9aa0a6; font-style italic; font-size 12px; }
+  .ck-resp { font-size 12px; color #5f6368; }
+  .ck-tabla input[type=date], .ck-tabla input.ck-coment {
+    padding 5px 8px; border 1px solid #d4d9df; border-radius 5px; font-size 12px; font-family inherit; width 100%;
+  }
+  .ck-coment { min-width 150px; }
+  .ck-venc-hint { display block; margin-top 3px; font-size 11px; color #6b7280; }
+  .ck-badge { display inline-block; padding 2px 9px; border-radius 999px; font-size 11px; font-weight 700; }
+  .ck-vencido-aviso { color #c5221f; font-size 11px; font-weight 700; white-space nowrap; }
+
+   Colores de fila por estado 
+  .ck-fila.est-pendiente { background #fbfbfc; }
+  .ck-fila.est-entregado { background #f0faf2; }
+  .ck-fila.est-vencido   { background #fdf1f0; }
+  .ck-fila.est-noaplica  { background #ebedf0; }
+  .ck-fila.est-noaplica .ck-doc { text-decoration line-through; color #80868b; }
+  .ck-badge.est-pendiente { background #e8eaed; color #5f6368; }
+  .ck-badge.est-entregado { background #ceead6; color #137333; }
+  .ck-badge.est-vencido   { background #fad2cf; color #c5221f; }
+  .ck-badge.est-noaplica  { background #d2d5da; color #3c4043; }
+
+   Botones de acción del checklist 
+  .ck-acciones { display flex; gap 3px; }
+  .ck-btn-est {
+    cursor pointer; border 1px solid #e3e6ea; background #fff; border-radius 5px;
+    padding 3px 6px; font-size 14px; line-height 1;
+  }
+  .ck-btn-esthover { background #f1f3f4; transform scale(1.08); }
+
+   ===================================================== 
+   MÓDULO 4 — DASHBOARD                                    
+   ===================================================== 
+  .dash-cards { display grid; grid-template-columns repeat(2, 1fr); gap 14px; margin-bottom 20px; max-width 560px; }
+  .dash-card {
+    background #fff; border-radius 10px; padding 18px 20px; box-shadow 0 1px 4px rgba(0,0,0,.08);
+    display flex; flex-direction column; gap 4px; border-left 4px solid var(--secundario);
+  }
+  .dash-card-num { font-size 30px; font-weight 800; color var(--primario); line-height 1; }
+  .dash-card-lbl { font-size 12px; color #6b7280; font-weight 600; text-transform uppercase; letter-spacing .4px; }
+  .dash-card-pct { border-left-color #34a853; }
+  .dash-card-pct .dash-card-num { color #137333; }
+
+  .dash-grid { display grid; grid-template-columns 1.4fr 1fr; gap 16px; align-items start; }
+  .dash-panel { background #fff; border-radius 10px; box-shadow 0 1px 4px rgba(0,0,0,.08); padding 16px; }
+  .dash-panel .tabla-wrap { box-shadow none; }
+  .dash-panel-title { font-size 14px; font-weight 700; color var(--primario); margin-bottom 12px; }
+  .dash-pie { width 100%; height 320px; }
+
+  .dash-pct-cell { font-weight 700; color var(--primario); white-space nowrap; }
+  .dash-bar-cell { min-width 180px; }
+  .dash-bar { display flex; height 12px; border-radius 999px; overflow hidden; background #eef0f3; min-width 140px; }
+  .dash-bar .seg { height 100%; }
+  .dash-bar-empty { font-size 11px; color #9aa0a6; font-style italic; padding-left 6px; line-height 12px; }
+
+  @media (max-width 820px) {
+    .dash-cards { grid-template-columns 1fr; max-width none; }
+    .dash-grid { grid-template-columns 1fr; }
+  }
+
+   ===================================================== 
+   MÓDULO 4 — REPORTE                                     
+   ===================================================== 
+  .modal-reporte { max-width 760px; max-height 86vh; overflow-y auto; }
+  .rep-header { border-bottom 2px solid var(--primario); padding-bottom 10px; margin-bottom 14px; display flex; align-items baseline; justify-content space-between; flex-wrap wrap; gap 6px; }
+  .rep-header h2 { color var(--primario); font-size 20px; }
+  .rep-fecha { font-size 12px; color #6b7280; }
+  .rep-meta { display grid; grid-template-columns 1fr 1fr; gap 8px 18px; margin-bottom 16px; }
+  .rep-meta  div { display flex; flex-direction column; }
+  .rep-lbl { font-size 11px; color #9aa0a6; text-transform uppercase; letter-spacing .4px; font-weight 600; }
+  .rep-val { font-size 14px; color #1f2937; font-weight 600; }
+  .rep-resumen { display flex; align-items center; gap 18px; background #f7f9fc; border-radius 8px; padding 14px 16px; margin-bottom 18px; flex-wrap wrap; }
+  .rep-pct { font-size 30px; font-weight 800; color var(--primario); display flex; flex-direction column; line-height 1; }
+  .rep-pct small { font-size 11px; font-weight 600; color #6b7280; text-transform uppercase; letter-spacing .4px; }
+  .rep-chips { display flex; flex-wrap wrap; gap 6px; }
+  .rep-personalidad { border 1px solid #e6e9ee; border-radius 10px; padding 16px; margin-bottom 16px; }
+  .rep-pers-titulo { color var(--primario); font-size 16px; margin-bottom 4px; }
+  .rep-pers-tipo { font-size 12px; color #6b7280; font-weight 600; }
+  .rep-seccion { margin-bottom 16px; }
+  .rep-seccion h4 { font-size 13px; margin-bottom 8px; padding-bottom 4px; border-bottom 1px solid #eef0f3; }
+  .rep-h-vencido { color #c5221f; }
+  .rep-h-nosotros { color #1a3a8f; }
+  .rep-h-cliente { color #8a6d00; }
+  .rep-vacio { font-size 13px; color #9aa0a6; font-style italic; padding 4px 0; }
+  .rep-tabla { width 100%; border-collapse collapse; }
+  .rep-tabla th { text-align left; font-size 11px; color #6b7280; padding 6px 8px; border-bottom 1px solid #eef0f3; text-transform uppercase; letter-spacing .3px; }
+  .rep-tabla td { font-size 13px; padding 6px 8px; border-bottom 1px solid #f3f4f6; vertical-align top; }
+  .rep-resp { font-size 11px; font-weight 600; padding 2px 8px; border-radius 999px; white-space nowrap; }
+  .rep-resp-nosotros { background #e8f0fe; color #1a3a8f; }
+  .rep-resp-cliente { background #fef7e0; color #8a6d00; }
+
+   ===================================================== 
+   MÓDULO 5 — CONTROL DE CRÉDITO                          
+   ===================================================== 
+  .ctrl-cat { background #fff; border-radius 10px; box-shadow 0 1px 4px rgba(0,0,0,.08); margin-bottom 14px; overflow hidden; }
+  .ctrl-cat-header {
+    width 100%; display flex; align-items center; gap 10px; cursor pointer; text-align left;
+    background #f7f9fc; border none; padding 14px 16px; font-size 15px; font-weight 700; color var(--primario);
+    border-bottom 1px solid #eef0f3; border-left 4px solid var(--secundario);
+  }
+  .ctrl-cat-headerhover { background #eef3fb; }
+  .ctrl-cat-nombre { flex 1; }
+  .ctrl-cat.cerrado .ck-cat-arrow { transform rotate(-90deg); }
+  .ctrl-cat.cerrado .ctrl-cat-body { display none; }
+  .ctrl-cat-body { padding 18px 20px; }
+
+   Formularios de edición 
+  .ctrl-form { display grid; grid-template-columns repeat(auto-fill, minmax(220px, 1fr)); gap 14px 18px; }
+  .ctrl-form label { display block; font-size 13px; font-weight 600; color #374151; }
+  .ctrl-form input, .ctrl-form select {
+    width 100%; margin-top 6px; padding 9px 11px; border 1px solid #cbd2d9;
+    border-radius 6px; font-size 14px; font-family inherit; background #fff;
+  }
+  .ctrl-form inputfocus, .ctrl-form selectfocus { outline none; border-color var(--primario); }
+  .ctrl-form-acciones { display flex; justify-content flex-end; margin-top 16px; }
+
+   Vencimientos — tarjetas de alerta 
+  .ctrl-alerts { display grid; grid-template-columns repeat(auto-fit, minmax(220px, 1fr)); gap 12px; }
+  .ctrl-alert { display flex; flex-direction column; gap 4px; padding 14px 16px; border-radius 8px; border-left 4px solid #9aa0a6; background #f7f9fc; }
+  .ctrl-alert-lbl { font-size 11px; text-transform uppercase; letter-spacing .4px; font-weight 600; color #6b7280; }
+  .ctrl-alert-val { font-size 15px; font-weight 700; color #1f2937; }
+  .ctrl-alert-verde { border-left-color #34a853; background #f0faf2; }
+  .ctrl-alert-verde .ctrl-alert-val { color #137333; }
+  .ctrl-alert-ambar { border-left-color var(--secundario); background #fdf8ec; }
+  .ctrl-alert-ambar .ctrl-alert-val { color #8a6d00; }
+  .ctrl-alert-rojo { border-left-color #ea4335; background #fdf1f0; }
+  .ctrl-alert-rojo .ctrl-alert-val { color #c5221f; }
+  .ctrl-alert-gris { border-left-color #9aa0a6; background #f4f5f7; }
+  .ctrl-alert-gris .ctrl-alert-val { color #5f6368; font-weight 600; }
+  .ctrl-nota { margin-top 12px; font-size 12px; color #9aa0a6; font-style italic; }
+
+   Garantías 
+  .ctrl-gar-top { display flex; justify-content flex-end; margin-bottom 12px; }
+  .ctrl-gar-tabla { width 100%; border-collapse collapse; }
+  .ctrl-gar-tabla thead th {
+    background var(--primario); color #fff; text-align left; padding 10px 12px;
+    font-size 11px; text-transform uppercase; letter-spacing .4px;
+  }
+  .ctrl-gar-tabla td { padding 10px 12px; border-bottom 1px solid #eef0f3; font-size 13px; }
+  .ctrl-gar-valor { font-weight 700; color var(--primario); white-space nowrap; }
+  .ctrl-gar-estatus { display inline-block; padding 2px 10px; border-radius 999px; font-size 11px; font-weight 700; }
+  .ctrl-gar-vigente { background #e6f4ea; color #137333; }
+  .ctrl-gar-liberada { background #f1f3f4; color #5f6368; }
+  .ctrl-gar-total { margin-top 14px; text-align right; font-size 14px; color #374151; }
+  .ctrl-gar-total strong { color var(--primario); }
+
+   ===================================================== 
+   CARTERA SIAC                                            
+   ===================================================== 
+  .siac-vista-lbl { font-size 13px; font-weight 600; color #374151; }
+  .siac-vista-lbl select {
+    display block; margin-top 6px; min-width 220px; padding 9px 11px;
+    border 1px solid #cbd2d9; border-radius 6px; font-size 14px; font-family inherit; background #fff;
+  }
+
+   Totales por moneda 
+  .siac-totales { display flex; flex-direction column; gap 14px; margin-bottom 18px; }
+  .siac-tot-bloque { background #fff; border-radius 10px; box-shadow 0 1px 4px rgba(0,0,0,.08); padding 14px 16px; border-left 4px solid var(--secundario); }
+  .siac-tot-moneda { font-size 13px; font-weight 800; color var(--primario); text-transform uppercase; letter-spacing .5px; margin-bottom 10px; }
+  .siac-tot-cards { display grid; grid-template-columns repeat(auto-fit, minmax(170px, 1fr)); gap 12px; }
+  .siac-tot-card { display flex; flex-direction column; gap 4px; background #f7f9fc; border-radius 8px; padding 10px 12px; }
+  .siac-tot-lbl { font-size 11px; text-transform uppercase; letter-spacing .4px; font-weight 600; color #6b7280; }
+  .siac-tot-val { font-size 17px; font-weight 800; color #1f2937; }
+  .siac-tot-val.verde { color #137333; }
+  .siac-tot-val.rojo { color #c5221f; }
+
+   Tabla SIAC 
+  .siac-wrap { background #fff; border-radius 10px; overflow-x auto; box-shadow 0 1px 4px rgba(0,0,0,.08); }
+  .siac-tabla { width 100%; border-collapse collapse; min-width 900px; }
+  .siac-tabla thead th {
+    background var(--primario); color #fff; text-align left; padding 11px 12px;
+    font-size 11px; text-transform uppercase; letter-spacing .4px; cursor pointer; white-space nowrap; user-select none;
+  }
+  .siac-tabla thead thhover { filter brightness(1.12); }
+  .siac-tabla td { padding 10px 12px; border-bottom 1px solid #eef0f3; font-size 13px; }
+  .siac-tabla tbody tr[onclick] { cursor pointer; }
+  .siac-tabla tbody trhover { background #f8fafc; }
+  .siac-num { text-align right; white-space nowrap; font-variant-numeric tabular-nums; }
+  .siac-imor { text-align right; white-space nowrap; font-weight 700; color var(--primario); }
+  .siac-sort { margin-left 4px; font-size 10px; }
+  .siac-moneda-badge { display inline-block; padding 2px 8px; border-radius 999px; font-size 11px; font-weight 700; background #e8f0fe; color #1a3a8f; }
+  .siac-estado { display inline-block; padding 2px 10px; border-radius 999px; font-size 11px; font-weight 700; white-space nowrap; }
+  .siac-estado-vigente { background #e6f4ea; color #137333; }
+  .siac-estado-mora { background #fce8e6; color #c5221f; }
+  .siac-estado-liquidado { background #f1f3f4; color #5f6368; }
+
+  @media (max-width 600px) {
+    .ctrl-form { grid-template-columns 1fr; }
+  }
+style

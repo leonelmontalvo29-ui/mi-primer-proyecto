@@ -1,0 +1,569 @@
+/**
+ * ============================================================
+ * DOCUMENTOS KYC / EXPEDIENTE
+ * Factor GFC
+ *
+ * OBJETIVO:
+ * Determinar qué documentos corresponden a una personalidad
+ * utilizando la información existente en:
+ *
+ *   - Personalidades
+ *   - Documentos
+ *
+ * Este archivo NO modifica ninguna hoja.
+ * Solamente consulta información.
+ * ============================================================
+ */
+
+
+/**
+ * Obtiene los documentos aplicables a una personalidad.
+ *
+ * Ejemplo:
+ * obtenerDocumentosPersonalidad(8)
+ *
+ * Personalidad 8 -> Acred. PF
+ * -> busca todos los documentos que incluyan "Acred. PF"
+ *
+ * @param {string|number} idPersonalidad
+ * @return {Object}
+ */
+function obtenerDocumentosPersonalidad(idPersonalidad) {
+
+  // ----------------------------------------------------------
+  // VALIDAR ID
+  // ----------------------------------------------------------
+
+  if (!idPersonalidad) {
+    throw new Error(
+      'No se recibió el ID de la personalidad.'
+    );
+  }
+
+
+  // ----------------------------------------------------------
+  // ABRIR SPREADSHEET
+  // ----------------------------------------------------------
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  if (!ss) {
+    throw new Error(
+      'No fue posible acceder al archivo de Google Sheets.'
+    );
+  }
+
+
+  // ----------------------------------------------------------
+  // OBTENER HOJAS
+  // ----------------------------------------------------------
+
+  const hojaPersonalidades =
+    ss.getSheetByName('Personalidades');
+
+  const hojaDocumentos =
+    ss.getSheetByName('Documentos');
+
+
+  if (!hojaPersonalidades) {
+    throw new Error(
+      'No existe la hoja Personalidades.'
+    );
+  }
+
+  if (!hojaDocumentos) {
+    throw new Error(
+      'No existe la hoja Documentos.'
+    );
+  }
+
+
+  // ==========================================================
+  // 1. BUSCAR LA PERSONALIDAD
+  // ==========================================================
+
+  const datosPersonalidades =
+    hojaPersonalidades.getDataRange().getValues();
+
+
+  if (datosPersonalidades.length < 2) {
+    throw new Error(
+      'La hoja Personalidades no contiene registros.'
+    );
+  }
+
+
+  const encabezadosP =
+    datosPersonalidades[0];
+
+
+  // Encabezados reales de la hoja Personalidades:
+  //
+  // ID
+  // ID_Crédito
+  // Nombre de la personalidad
+  // Tipo
+  // ID_Cliente
+  // Pertenece a
+
+  const colId =
+    encabezadosP.indexOf('ID');
+
+  const colCredito =
+    encabezadosP.indexOf('ID_Crédito');
+
+  const colNombre =
+    encabezadosP.indexOf(
+      'Nombre de la personalidad'
+    );
+
+  const colTipo =
+    encabezadosP.indexOf('Tipo');
+
+  const colCliente =
+    encabezadosP.indexOf('ID_Cliente');
+
+
+  if (
+    colId === -1 ||
+    colNombre === -1 ||
+    colTipo === -1
+  ) {
+
+    throw new Error(
+      'No se encontraron los encabezados esperados ' +
+      'en la hoja Personalidades.'
+    );
+  }
+
+
+  let personalidad = null;
+
+
+  for (
+    let i = 1;
+    i < datosPersonalidades.length;
+    i++
+  ) {
+
+    const idFila =
+      String(
+        datosPersonalidades[i][colId]
+      ).trim();
+
+
+    if (
+      idFila ===
+      String(idPersonalidad).trim()
+    ) {
+
+      personalidad = {
+
+        id:
+          idFila,
+
+        idCredito:
+          colCredito !== -1
+            ? String(
+                datosPersonalidades[i][colCredito] || ''
+              ).trim()
+            : '',
+
+        nombre:
+          String(
+            datosPersonalidades[i][colNombre] || ''
+          ).trim(),
+
+        tipo:
+          String(
+            datosPersonalidades[i][colTipo] || ''
+          ).trim(),
+
+        idCliente:
+          colCliente !== -1
+            ? String(
+                datosPersonalidades[i][colCliente] || ''
+              ).trim()
+            : ''
+
+      };
+
+      break;
+    }
+  }
+
+
+  if (!personalidad) {
+
+    throw new Error(
+      'No se encontró la personalidad con ID ' +
+      idPersonalidad + '.'
+    );
+
+  }
+
+
+  // ==========================================================
+  // 2. LEER MATRIZ DE DOCUMENTOS
+  // ==========================================================
+
+  const datosDocumentos =
+    hojaDocumentos.getDataRange().getValues();
+
+
+  if (datosDocumentos.length < 2) {
+
+    return {
+
+      ok: true,
+
+      personalidad:
+        personalidad,
+
+      total:
+        0,
+
+      documentos:
+        []
+
+    };
+
+  }
+
+
+  const encabezadosD =
+    datosDocumentos[0];
+
+
+  // Encabezados observados en la hoja Documentos:
+  //
+  // ID
+  // Categoría
+  // Nombre del documento
+  // Tipo de personalidad
+  // Obligatorio
+
+  const colDocId =
+    encabezadosD.indexOf('ID');
+
+  const colCategoria =
+    encabezadosD.indexOf('Categoría');
+
+  const colDocumento =
+    encabezadosD.indexOf(
+      'Nombre del documento'
+    );
+
+  const colTipos =
+    encabezadosD.indexOf(
+      'Tipo de personalidad'
+    );
+
+  const colObligatorio =
+    encabezadosD.indexOf('Obligatorio');
+
+
+  if (
+    colDocId === -1 ||
+    colCategoria === -1 ||
+    colDocumento === -1 ||
+    colTipos === -1
+  ) {
+
+    throw new Error(
+      'No se encontraron los encabezados esperados ' +
+      'en la hoja Documentos.'
+    );
+
+  }
+
+
+  // ==========================================================
+  // 3. BUSCAR DOCUMENTOS APLICABLES
+  // ==========================================================
+
+  const documentosAplicables = [];
+
+
+  for (
+    let i = 1;
+    i < datosDocumentos.length;
+    i++
+  ) {
+
+    const fila =
+      datosDocumentos[i];
+
+
+    const tiposTexto =
+      String(
+        fila[colTipos] || ''
+      ).trim();
+
+
+    // Si el documento no tiene tipos asignados,
+    // no lo agregamos.
+    if (!tiposTexto) {
+      continue;
+    }
+
+
+    /*
+     * Ejemplo de contenido:
+     *
+     * Acred. PM, Acred. PF, Rep. Legal PF,
+     * Aval PM, Aval PF, Garante PM...
+     *
+     * Lo convertimos en una lista.
+     */
+
+    const tiposAplicables =
+      tiposTexto
+        .split(',')
+        .map(function(tipo) {
+
+          return tipo.trim();
+
+        })
+        .filter(function(tipo) {
+
+          return tipo !== '';
+
+        });
+
+
+    // --------------------------------------------------------
+    // COMPARACIÓN DEL TIPO DE PERSONALIDAD
+    // --------------------------------------------------------
+
+    const aplica =
+      tiposAplicables.some(
+        function(tipo) {
+
+          return (
+            normalizarTextoKYC_(tipo) ===
+            normalizarTextoKYC_(
+              personalidad.tipo
+            )
+          );
+
+        }
+      );
+
+
+    if (!aplica) {
+      continue;
+    }
+
+
+    // --------------------------------------------------------
+    // DOCUMENTO APLICABLE
+    // --------------------------------------------------------
+
+    documentosAplicables.push({
+
+      id:
+        fila[colDocId],
+
+      categoria:
+        String(
+          fila[colCategoria] || ''
+        ).trim(),
+
+      nombre:
+        String(
+          fila[colDocumento] || ''
+        ).trim(),
+
+      obligatorio:
+        colObligatorio !== -1
+          ? String(
+              fila[colObligatorio] || ''
+            ).trim()
+          : ''
+
+    });
+
+  }
+
+
+  // ==========================================================
+  // 4. RESULTADO
+  // ==========================================================
+
+  return {
+
+    ok:
+      true,
+
+    personalidad:
+      personalidad,
+
+    total:
+      documentosAplicables.length,
+
+    documentos:
+      documentosAplicables
+
+  };
+
+}
+
+
+/**
+ * ============================================================
+ * NORMALIZAR TEXTO
+ *
+ * Sirve para comparar:
+ *
+ * "Acred. PF"
+ * "acred. pf"
+ *
+ * También evita problemas por espacios o acentos.
+ *
+ * NO modifica información de Sheets.
+ * ============================================================
+ */
+function normalizarTextoKYC_(texto) {
+
+  return String(texto || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+
+}
+
+
+/**
+ * ============================================================
+ * PRUEBA DEL MOTOR
+ *
+ * Utilizamos la personalidad ID 8.
+ *
+ * Según nuestra base:
+ *
+ * ID 8
+ * Alejandro José Trava Lopez
+ * Acred. PF
+ *
+ * ============================================================
+ */
+function probarDocumentosPersonalidad() {
+
+  console.log(
+    '===== INICIO PRUEBA DOCUMENTOS ====='
+  );
+
+
+  const resultado =
+    obtenerDocumentosPersonalidad(8);
+
+
+  console.log(
+    'Personalidad: ' +
+    resultado.personalidad.nombre
+  );
+
+
+  console.log(
+    'Tipo: ' +
+    resultado.personalidad.tipo
+  );
+
+
+  console.log(
+    'ID Cliente: ' +
+    resultado.personalidad.idCliente
+  );
+
+
+  console.log(
+    'ID Crédito: ' +
+    resultado.personalidad.idCredito
+  );
+
+
+  console.log(
+    'Total documentos aplicables: ' +
+    resultado.total
+  );
+
+
+  resultado.documentos.forEach(
+    function(documento) {
+
+      console.log(
+        documento.id +
+        ' | ' +
+        documento.categoria +
+        ' | ' +
+        documento.nombre +
+        ' | Obligatorio: ' +
+        documento.obligatorio
+      );
+
+    }
+  );
+
+
+  console.log(
+    '===== FIN PRUEBA DOCUMENTOS ====='
+  );
+
+}
+
+
+/**
+ * ============================================================
+ * PRUEBA MÍNIMA
+ *
+ * Esta función sirve para comprobar que Apps Script puede
+ * acceder al Spreadsheet y a las dos hojas necesarias.
+ *
+ * NO modifica absolutamente nada.
+ * ============================================================
+ */
+function pruebaMinimaDocumentos() {
+
+  console.log('INICIO');
+
+
+  const ss =
+    SpreadsheetApp.getActiveSpreadsheet();
+
+
+  console.log(
+    'Spreadsheet OK: ' +
+    ss.getName()
+  );
+
+
+  const hojaP =
+    ss.getSheetByName(
+      'Personalidades'
+    );
+
+
+  console.log(
+    'Personalidades: ' +
+    (hojaP ? 'OK' : 'NO')
+  );
+
+
+  const hojaD =
+    ss.getSheetByName(
+      'Documentos'
+    );
+
+
+  console.log(
+    'Documentos: ' +
+    (hojaD ? 'OK' : 'NO')
+  );
+
+
+  console.log('FIN');
+
+}

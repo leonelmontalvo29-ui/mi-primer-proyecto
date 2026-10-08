@@ -1,0 +1,1219 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f5f6f8;
+      margin: 0;
+      padding: 25px;
+      color: #222;
+    }
+
+    .contenedor {
+      max-width: 820px;
+      margin: auto;
+      background: white;
+      padding: 32px;
+      border-radius: 10px;
+    }
+
+    h1 {
+      margin-top: 0;
+      font-size: 26px;
+    }
+
+    .subtitulo {
+      color: #666;
+      margin-bottom: 30px;
+    }
+
+    .seccion {
+      margin-top: 35px;
+      border-bottom: 2px solid #ddd;
+      padding-bottom: 8px;
+      font-size: 20px;
+      font-weight: bold;
+    }
+
+    label {
+      display: block;
+      margin-top: 18px;
+      margin-bottom: 6px;
+      font-weight: bold;
+    }
+
+    input,
+    select,
+    textarea {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      font-size: 14px;
+    }
+
+    textarea {
+      min-height: 80px;
+      resize: vertical;
+    }
+
+    .fila {
+      display: flex;
+      gap: 18px;
+    }
+
+    .campo {
+      flex: 1;
+    }
+
+    .opciones {
+      margin-top: 10px;
+    }
+
+    .opcion {
+      display: flex;
+      align-items: center;
+      margin: 8px 0;
+    }
+
+    .opcion input {
+      width: auto;
+      margin-right: 8px;
+    }
+
+    .oculto {
+      display: none;
+    }
+
+    .nota {
+      margin-top: 8px;
+      font-size: 12px;
+      color: #777;
+    }
+
+    button {
+      margin-top: 35px;
+      padding: 14px 28px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 15px;
+    }
+  </style>
+</head>
+
+<body>
+  <!-- ======================================================
+     VINCULACIÓN DEL KYC
+     Cliente → Crédito → Personalidad
+======================================================= -->
+
+<div style="
+  padding:18px;
+  margin-bottom:20px;
+  border:1px solid #d9d9d9;
+  border-radius:8px;
+  background:#f7f7f7;
+">
+
+  <h3 style="margin-top:0;">
+    Vinculación del KYC
+  </h3>
+
+  <p style="margin-bottom:18px;">
+    Seleccione el cliente, crédito y personalidad a la que
+    corresponde este KYC.
+  </p>
+
+  <label for="kycCliente">
+    <strong>Cliente</strong>
+  </label>
+
+  <select
+    id="kycCliente"
+    onchange="cargarCreditosKYC()"
+    style="width:100%; padding:8px; margin:6px 0 14px 0;"
+  >
+    <option value="">Seleccione un cliente</option>
+  </select>
+
+
+  <label for="kycCredito">
+    <strong>Crédito</strong>
+  </label>
+
+  <select
+    id="kycCredito"
+    onchange="cargarPersonalidadesKYC()"
+    disabled
+    style="width:100%; padding:8px; margin:6px 0 14px 0;"
+  >
+    <option value="">Primero seleccione un cliente</option>
+  </select>
+
+
+  <label for="kycPersonalidad">
+    <strong>Personalidad</strong>
+  </label>
+
+  <select
+    id="kycPersonalidad"
+    disabled
+    style="width:100%; padding:8px; margin-top:6px;"
+  >
+    <option value="">Primero seleccione un crédito</option>
+  </select>
+<select
+  id="kycPersonalidad"
+  disabled
+  style="width:100%; padding:8px; margin-top:6px;"
+>
+  <option value="">Primero seleccione un crédito</option>
+</select>
+
+<!-- BOTÓN PARA CONSULTAR DOCUMENTOS -->
+<button
+  type="button"
+  id="btnDocumentosAplicables"
+  onclick="verDocumentosAplicables()"
+  style="
+    margin-top:15px;
+    padding:10px 18px;
+    cursor:pointer;
+  "
+>
+  Ver documentos aplicables
+</button>
+
+<div
+  id="resultadoDocumentos"
+  style="
+    margin-top:15px;
+    display:none;
+  "
+></div>
+
+</div>
+</div>
+
+<div class="contenedor">
+
+  <h1>Conocimiento del Cliente</h1>
+
+  <div class="subtitulo">
+    Complete la siguiente información para iniciar la integración de su expediente.
+  </div>
+
+
+  <!-- ===================================================== -->
+  <!-- 1. CLASIFICACIÓN -->
+  <!-- ===================================================== -->
+
+  <div class="seccion">
+    1. Clasificación
+  </div>
+
+  <label>Tipo de persona</label>
+
+  <select id="tipoPersona" onchange="cambiarTipoPersona()">
+    <option value="">Seleccione una opción</option>
+    <option value="PF">Persona Física</option>
+    <option value="PM">Persona Moral</option>
+  </select>
+
+  <div id="avisoPM" class="oculto nota">
+    El formulario para Persona Moral se incorporará en la siguiente etapa.
+  </div>
+
+
+  <label>Participación en la operación</label>
+
+  <div class="opciones">
+
+    <div class="opcion">
+      <input type="checkbox" id="obligadoSolidario">
+      <span>Obligado solidario / Aval</span>
+    </div>
+
+    <div class="opcion">
+      <input type="checkbox" id="representanteLegal">
+      <span>Representante Legal</span>
+    </div>
+
+    <div class="opcion">
+      <input type="checkbox" id="proveedorRecursos">
+      <span>Proveedor de Recursos</span>
+    </div>
+
+    <div class="opcion">
+      <input type="checkbox" id="garante">
+      <span>Garante</span>
+    </div>
+
+    <div class="opcion">
+      <input type="checkbox" id="propietarioReal">
+      <span>Propietario Real</span>
+    </div>
+
+    <div class="opcion">
+      <input type="checkbox" id="coacreditado">
+      <span>Coacreditado</span>
+    </div>
+
+  </div>
+
+
+  <!-- ===================================================== -->
+  <!-- FORMULARIO PERSONA FÍSICA -->
+  <!-- ===================================================== -->
+
+  <div id="formPF" class="oculto">
+
+
+    <!-- DATOS GENERALES -->
+
+    <div class="seccion">
+      2. Datos generales
+    </div>
+
+    <label>Nombre completo</label>
+    <input type="text" id="nombreCompleto"
+           placeholder="Nombre(s), apellido paterno y apellido materno">
+
+
+    <div class="fila">
+
+      <div class="campo">
+        <label>Fecha de nacimiento</label>
+        <input type="date" id="fechaNacimiento">
+      </div>
+
+      <div class="campo">
+        <label>RFC con homoclave</label>
+        <input type="text" id="rfc"
+               placeholder="Ej. ABCD900101XXX">
+      </div>
+
+    </div>
+
+
+    <div class="fila">
+
+      <div class="campo">
+        <label>País de nacimiento</label>
+        <input type="text" id="paisNacimiento">
+      </div>
+
+      <div class="campo">
+        <label>Entidad federativa de nacimiento</label>
+        <input type="text" id="entidadNacimiento">
+      </div>
+
+    </div>
+
+
+    <div class="fila">
+
+      <div class="campo">
+        <label>País de residencia</label>
+        <input type="text"
+               id="paisResidencia"
+               onchange="evaluarResidencia()"
+               placeholder="Ej. México">
+      </div>
+
+      <div class="campo">
+        <label>Nacionalidad</label>
+        <input type="text" id="nacionalidad">
+      </div>
+
+    </div>
+
+
+    <div id="motivoMexicoContenedor" class="oculto">
+
+      <label>
+        Razones por las que decidió celebrar créditos o servicios en México
+      </label>
+
+      <textarea id="motivoMexico"></textarea>
+
+    </div>
+
+
+    <div class="fila">
+
+      <div class="campo">
+
+        <label>Género</label>
+
+        <select id="genero">
+          <option value="">Seleccione</option>
+          <option value="Masculino">Masculino</option>
+          <option value="Femenino">Femenino</option>
+          <option value="Otro">Otro</option>
+        </select>
+
+      </div>
+
+
+      <div class="campo">
+
+        <label>CURP</label>
+
+        <input type="text"
+               id="curp"
+               placeholder="18 caracteres">
+
+      </div>
+
+    </div>
+
+
+    <label>Ocupación / Profesión</label>
+    <input type="text" id="ocupacion">
+
+
+    <label>Actividad económica que desempeña / Giro empresarial detallado</label>
+    <textarea id="actividadEconomica"></textarea>
+
+
+
+    <!-- DATOS FISCALES -->
+
+    <div class="seccion">
+      3. Información fiscal y migratoria
+    </div>
+
+
+    <label>FIEL</label>
+    <input type="text"
+           id="fiel"
+           placeholder="En caso de no aplicar, el sistema registrará N/A">
+
+
+    <div class="fila">
+
+      <div class="campo">
+
+        <label>Número de Identificación Fiscal</label>
+        <input type="text" id="numeroIdentificacionFiscal">
+
+      </div>
+
+
+      <div class="campo">
+
+        <label>País que lo asigna</label>
+        <input type="text" id="paisIdentificacionFiscal">
+
+      </div>
+
+    </div>
+
+
+    <label>Tipo y número de Forma Migratoria</label>
+
+    <input type="text"
+           id="formaMigratoria"
+           placeholder="Solo aplica para extranjeros">
+
+
+
+    <!-- CONTACTO -->
+
+    <div class="seccion">
+      4. Información de contacto
+    </div>
+
+
+    <div class="fila">
+
+      <div class="campo">
+
+        <label>Teléfono fijo</label>
+        <input type="tel" id="telefonoFijo">
+
+      </div>
+
+
+      <div class="campo">
+
+        <label>Teléfono celular</label>
+        <input type="tel" id="telefonoCelular">
+
+      </div>
+
+    </div>
+
+
+    <label>Correo electrónico</label>
+
+    <input type="email"
+           id="correoElectronico"
+           placeholder="correo@ejemplo.com">
+
+
+    <label>Estado civil</label>
+
+    <select id="estadoCivil">
+      <option value="">Seleccione</option>
+      <option value="Soltero(a)">Soltero(a)</option>
+      <option value="Casado(a)">Casado(a)</option>
+      <option value="Divorciado(a)">Divorciado(a)</option>
+      <option value="Viudo(a)">Viudo(a)</option>
+      <option value="Unión libre">Unión libre</option>
+      <option value="Otro">Otro</option>
+    </select>
+
+
+
+    <!-- REPRESENTANTE / APODERADO -->
+
+    <div class="seccion">
+      5. Representación legal
+    </div>
+
+
+    <label>Nombre completo del apoderado legal</label>
+
+    <input type="text"
+           id="apoderadoLegal"
+           placeholder="Si no aplica, dejar vacío">
+
+
+    <label>Nacionalidad del Representante Legal</label>
+
+    <input type="text"
+           id="nacionalidadRepresentante">
+
+
+
+    <!-- DOMICILIO -->
+
+    <div class="seccion">
+      6. Domicilio
+    </div>
+
+
+    <label>Calle / Avenida / Vía</label>
+    <input type="text" id="calle">
+
+
+    <div class="fila">
+
+      <div class="campo">
+
+        <label>Número exterior</label>
+        <input type="text" id="numeroExterior">
+
+      </div>
+
+
+      <div class="campo">
+
+        <label>Número interior</label>
+        <input type="text" id="numeroInterior">
+
+      </div>
+
+    </div>
+
+
+    <div class="fila">
+
+      <div class="campo">
+
+        <label>Delegación / Municipio</label>
+        <input type="text" id="municipio">
+
+      </div>
+
+
+      <div class="campo">
+
+        <label>Ciudad / Población</label>
+        <input type="text" id="ciudad">
+
+      </div>
+
+    </div>
+
+
+    <label>Colonia / Urbanización</label>
+    <input type="text" id="colonia">
+
+
+    <div class="fila">
+
+      <div class="campo">
+
+        <label>Estado / Provincia</label>
+        <input type="text" id="estado">
+
+      </div>
+
+
+      <div class="campo">
+
+        <label>País</label>
+        <input type="text" id="pais">
+
+      </div>
+
+    </div>
+
+
+    <label>Código postal</label>
+    <input type="text"
+           id="codigoPostal"
+           maxlength="10">
+
+
+
+    <!-- INFORMACIÓN DEL CRÉDITO -->
+
+    <div class="seccion">
+      7. Información de la solicitud de crédito
+    </div>
+
+
+    <label>
+      Nombre / Razón social del acreditado bajo el cual se solicita el crédito
+    </label>
+
+    <input type="text" id="nombreAcreditado">
+
+
+    <label>Tipo e importe del crédito o servicio solicitado</label>
+
+    <input type="text"
+           id="tipoImporteCredito"
+           placeholder="Ej. Crédito simple - $1,500,000.00">
+
+
+    <label>Destino del recurso solicitado</label>
+
+    <textarea id="destinoCredito"></textarea>
+
+
+    <label>
+      ¿En lo personal tiene créditos vigentes con Factor GFC?
+    </label>
+
+    <select id="creditosVigentes"
+            onchange="mostrarDetalleCredito()">
+
+      <option value="">Seleccione</option>
+      <option value="SI">Sí</option>
+      <option value="NO">No</option>
+
+    </select>
+
+
+    <div id="detalleCreditoContenedor" class="oculto">
+
+      <label>
+        Especifique el importe y tipo de crédito vigente
+      </label>
+
+      <textarea id="detalleCredito"></textarea>
+
+    </div>
+
+
+
+    <!-- PROPIETARIO REAL / PROVEEDOR RECURSOS -->
+
+    <div class="seccion">
+      8. Información complementaria
+    </div>
+
+
+    <label>
+      Razón por la cual funge como Propietario Real
+    </label>
+
+    <textarea id="razonPropietarioReal"></textarea>
+
+
+    <label>
+      Razón por la cual está aportando pagos o depósitos al crédito solicitado
+    </label>
+
+    <textarea id="razonProveedorRecursos"></textarea>
+
+
+
+    <!-- DECLARATORIAS -->
+
+    <div class="seccion">
+      9. Declaratorias
+    </div>
+
+
+    <label>
+      ¿Desempeña o desempeñó algún cargo público a nivel federal,
+      estatal, municipal en México o en algún país extranjero?
+    </label>
+
+    <select id="cargoPublico"
+            onchange="mostrarCargoPublico()">
+
+      <option value="">Seleccione</option>
+      <option value="SI">Sí</option>
+      <option value="NO">No</option>
+
+    </select>
+
+
+    <div id="cargoPublicoDetalleContenedor"
+         class="oculto">
+
+      <label>
+        Especifique dependencia, puesto, principales funciones
+        y periodo de ejercicio
+      </label>
+
+      <textarea id="cargoPublicoDetalle"></textarea>
+
+    </div>
+
+
+    <label>
+      ¿Su cónyuge o algún pariente por consanguinidad o afinidad
+      en segundo grado desempeña o desempeñó algún cargo público?
+    </label>
+
+    <select id="familiarCargoPublico"
+            onchange="mostrarFamiliarCargo()">
+
+      <option value="">Seleccione</option>
+      <option value="SI">Sí</option>
+      <option value="NO">No</option>
+
+    </select>
+
+
+    <div id="familiarCargoDetalleContenedor"
+         class="oculto">
+
+      <label>
+        Especifique la información correspondiente
+      </label>
+
+      <textarea id="familiarCargoDetalle"></textarea>
+
+    </div>
+
+
+    <button type="button"
+            onclick="revisarFormulario()">
+      Revisar información
+    </button>
+
+  </div>
+
+</div>
+
+
+
+<script>
+
+/* ==========================================
+   PERSONA FÍSICA / MORAL
+========================================== */
+
+function cambiarTipoPersona() {
+
+  const tipo =
+    document.getElementById('tipoPersona').value;
+
+  const pf =
+    document.getElementById('formPF');
+
+  const aviso =
+    document.getElementById('avisoPM');
+
+
+  if (tipo === 'PF') {
+
+    pf.classList.remove('oculto');
+    aviso.classList.add('oculto');
+
+  } else if (tipo === 'PM') {
+
+    pf.classList.add('oculto');
+    aviso.classList.remove('oculto');
+
+  } else {
+
+    pf.classList.add('oculto');
+    aviso.classList.add('oculto');
+
+  }
+}
+
+
+
+/* ==========================================
+   RESIDENCIA EN MÉXICO
+========================================== */
+
+function evaluarResidencia() {
+
+  const pais =
+    document.getElementById('paisResidencia')
+      .value
+      .trim()
+      .toLowerCase();
+
+  const contenedor =
+    document.getElementById(
+      'motivoMexicoContenedor'
+    );
+
+  if (
+    pais &&
+    pais !== 'mexico' &&
+    pais !== 'méxico'
+  ) {
+
+    contenedor.classList.remove('oculto');
+
+  } else {
+
+    contenedor.classList.add('oculto');
+
+  }
+
+}
+
+
+
+/* ==========================================
+   CRÉDITOS VIGENTES
+========================================== */
+
+function mostrarDetalleCredito() {
+
+  const valor =
+    document.getElementById(
+      'creditosVigentes'
+    ).value;
+
+  const contenedor =
+    document.getElementById(
+      'detalleCreditoContenedor'
+    );
+
+  if (valor === 'SI') {
+
+    contenedor.classList.remove('oculto');
+
+  } else {
+
+    contenedor.classList.add('oculto');
+
+  }
+
+}
+
+
+
+/* ==========================================
+   CARGO PÚBLICO
+========================================== */
+
+function mostrarCargoPublico() {
+
+  const valor =
+    document.getElementById(
+      'cargoPublico'
+    ).value;
+
+  const contenedor =
+    document.getElementById(
+      'cargoPublicoDetalleContenedor'
+    );
+
+  if (valor === 'SI') {
+
+    contenedor.classList.remove('oculto');
+
+  } else {
+
+    contenedor.classList.add('oculto');
+
+  }
+
+}
+
+
+
+/* ==========================================
+   FAMILIAR CON CARGO PÚBLICO
+========================================== */
+
+function mostrarFamiliarCargo() {
+
+  const valor =
+    document.getElementById(
+      'familiarCargoPublico'
+    ).value;
+
+  const contenedor =
+    document.getElementById(
+      'familiarCargoDetalleContenedor'
+    );
+
+  if (valor === 'SI') {
+
+    contenedor.classList.remove('oculto');
+
+  } else {
+
+    contenedor.classList.add('oculto');
+
+  }
+
+}
+
+
+
+/* ==========================================
+   REVISIÓN TEMPORAL
+========================================== */
+
+function revisarFormulario() {
+
+  const nombre = document.getElementById('nombreCompleto').value.trim();
+  const rfc = document.getElementById('rfc').value.trim();
+
+  if (!nombre || !rfc) {
+    alert('Por favor capture al menos el nombre completo y el RFC.');
+    return;
+  }
+
+  const datos = {
+
+    idCliente: document.getElementById('kycCliente').value,
+
+   idCredito: document.getElementById('kycCredito').value,
+
+   idPersonalidad: document.getElementById('kycPersonalidad').value,
+
+    tipoPersona: document.getElementById('tipoPersona').value,
+
+    obligadoSolidario: document.getElementById('obligadoSolidario').checked ? 'SI' : 'NO',
+    representanteLegal: document.getElementById('representanteLegal').checked ? 'SI' : 'NO',
+    proveedorRecursos: document.getElementById('proveedorRecursos').checked ? 'SI' : 'NO',
+    garante: document.getElementById('garante').checked ? 'SI' : 'NO',
+    propietarioReal: document.getElementById('propietarioReal').checked ? 'SI' : 'NO',
+    coacreditado: document.getElementById('coacreditado').checked ? 'SI' : 'NO',
+
+    nombreCompleto: nombre,
+    fechaNacimiento: document.getElementById('fechaNacimiento').value,
+    rfc: rfc,
+    paisNacimiento: document.getElementById('paisNacimiento').value,
+    entidadNacimiento: document.getElementById('entidadNacimiento').value,
+    paisResidencia: document.getElementById('paisResidencia').value,
+    motivoMexico: document.getElementById('motivoMexico').value,
+    nacionalidad: document.getElementById('nacionalidad').value,
+    genero: document.getElementById('genero').value,
+    curp: document.getElementById('curp').value,
+    ocupacion: document.getElementById('ocupacion').value,
+    actividadEconomica: document.getElementById('actividadEconomica').value,
+
+    fiel: document.getElementById('fiel').value,
+    numeroIdentificacionFiscal: document.getElementById('numeroIdentificacionFiscal').value,
+    paisIdentificacionFiscal: document.getElementById('paisIdentificacionFiscal').value,
+    formaMigratoria: document.getElementById('formaMigratoria').value,
+
+    telefonoFijo: document.getElementById('telefonoFijo').value,
+    telefonoCelular: document.getElementById('telefonoCelular').value,
+    correoElectronico: document.getElementById('correoElectronico').value,
+    estadoCivil: document.getElementById('estadoCivil').value,
+
+    apoderadoLegal: document.getElementById('apoderadoLegal').value,
+    nacionalidadRepresentante: document.getElementById('nacionalidadRepresentante').value,
+
+    calle: document.getElementById('calle').value,
+    numeroExterior: document.getElementById('numeroExterior').value,
+    numeroInterior: document.getElementById('numeroInterior').value,
+    municipio: document.getElementById('municipio').value,
+    ciudad: document.getElementById('ciudad').value,
+    colonia: document.getElementById('colonia').value,
+    estado: document.getElementById('estado').value,
+    pais: document.getElementById('pais').value,
+    codigoPostal: document.getElementById('codigoPostal').value,
+
+    nombreAcreditado: document.getElementById('nombreAcreditado').value,
+    tipoImporteCredito: document.getElementById('tipoImporteCredito').value,
+    destinoCredito: document.getElementById('destinoCredito').value,
+    creditosVigentes: document.getElementById('creditosVigentes').value,
+    detalleCredito: document.getElementById('detalleCredito').value,
+
+    razonPropietarioReal: document.getElementById('razonPropietarioReal').value,
+    razonProveedorRecursos: document.getElementById('razonProveedorRecursos').value,
+
+    cargoPublico: document.getElementById('cargoPublico').value,
+    cargoPublicoDetalle: document.getElementById('cargoPublicoDetalle').value,
+
+    familiarCargoPublico: document.getElementById('familiarCargoPublico').value,
+    familiarCargoDetalle: document.getElementById('familiarCargoDetalle').value
+  };
+ if (!datos.idCliente) {
+  alert('Seleccione el cliente.');
+  return;
+  }
+
+ if (!datos.idCredito) {
+  alert('Seleccione el crédito.');
+  return;
+  }
+
+ if (!datos.idPersonalidad) {
+  alert('Seleccione la personalidad.');
+  return;
+  }
+google.script.run
+  .withSuccessHandler(function(respuesta) {
+
+    console.log('Respuesta del servidor:', respuesta);
+
+    if (respuesta && respuesta.ok) {
+
+      alert(
+        'KYC guardado correctamente.\n\n' +
+        'Solicitud: ' + respuesta.idSolicitud
+      );
+
+    } else {
+
+      alert('La información se procesó, pero no se recibió una respuesta válida.');
+
+    }
+
+  })
+  .withFailureHandler(function(error) {
+
+    console.error('Error al guardar KYC:', error);
+
+    alert(
+      'Ocurrió un error al guardar la información:\n\n' +
+      error.message
+    );
+
+  })
+.guardarDatosKYC(datos);
+}
+// ======================================================
+// KYC - CLIENTE → CRÉDITO → PERSONALIDAD
+// ======================================================
+
+function iniciarVinculacionKYC() {
+
+  google.script.run
+
+    .withSuccessHandler(function(clientes) {
+
+      const select =
+        document.getElementById('kycCliente');
+
+      select.innerHTML =
+        '<option value="">Seleccione un cliente</option>';
+
+      clientes.forEach(function(cliente) {
+
+        const option =
+          document.createElement('option');
+
+        option.value = cliente.id;
+        option.textContent =
+          cliente.nombre + ' (' + cliente.id + ')';
+
+        select.appendChild(option);
+      });
+
+    })
+
+    .withFailureHandler(function(error) {
+
+      alert(
+        'No fue posible cargar los clientes:\n' +
+        error.message
+      );
+
+    })
+
+    .obtenerClientesKYC();
+}
+
+
+function cargarCreditosKYC() {
+
+  const idCliente =
+    document.getElementById('kycCliente').value;
+
+  const credito =
+    document.getElementById('kycCredito');
+
+  const personalidad =
+    document.getElementById('kycPersonalidad');
+
+
+  credito.innerHTML =
+    '<option value="">Cargando...</option>';
+
+  personalidad.innerHTML =
+    '<option value="">Primero seleccione un crédito</option>';
+
+  personalidad.disabled = true;
+
+
+  if (!idCliente) {
+
+    credito.innerHTML =
+      '<option value="">Primero seleccione un cliente</option>';
+
+    credito.disabled = true;
+
+    return;
+  }
+
+
+  google.script.run
+
+    .withSuccessHandler(function(creditos) {
+
+      credito.innerHTML =
+        '<option value="">Seleccione un crédito</option>';
+
+
+      creditos.forEach(function(item) {
+
+        const option =
+          document.createElement('option');
+
+        option.value = item.id;
+
+        option.textContent =
+          item.nombre + ' (' + item.id + ')';
+
+        credito.appendChild(option);
+      });
+
+
+      credito.disabled = false;
+
+
+      if (creditos.length === 0) {
+
+        credito.innerHTML =
+          '<option value="">Este cliente no tiene créditos</option>';
+
+        credito.disabled = true;
+      }
+
+    })
+
+    .withFailureHandler(function(error) {
+
+      alert(
+        'No fue posible cargar los créditos:\n' +
+        error.message
+      );
+
+    })
+
+    .obtenerCreditosKYC(idCliente);
+}
+
+
+function cargarPersonalidadesKYC() {
+
+  const idCredito =
+    document.getElementById('kycCredito').value;
+
+  const select =
+    document.getElementById('kycPersonalidad');
+
+
+  if (!idCredito) {
+
+    select.innerHTML =
+      '<option value="">Primero seleccione un crédito</option>';
+
+    select.disabled = true;
+
+    return;
+  }
+
+
+  select.innerHTML =
+    '<option value="">Cargando...</option>';
+
+
+  google.script.run
+
+    .withSuccessHandler(function(personalidades) {
+
+      select.innerHTML =
+        '<option value="">Seleccione una personalidad</option>';
+
+
+      personalidades.forEach(function(persona) {
+
+        const option =
+          document.createElement('option');
+
+        option.value = persona.id;
+
+        option.textContent =
+          persona.nombre +
+          (persona.tipo ? ' — ' + persona.tipo : '');
+
+        select.appendChild(option);
+      });
+
+
+      select.disabled = false;
+
+
+      if (personalidades.length === 0) {
+
+        select.innerHTML =
+          '<option value="">Este crédito no tiene personalidades</option>';
+
+        select.disabled = true;
+      }
+
+    })
+
+    .withFailureHandler(function(error) {
+
+      alert(
+        'No fue posible cargar las personalidades:\n' +
+        error.message
+      );
+
+    })
+
+    .obtenerPersonalidadesKYC(idCredito);
+}
+
+
+// Ejecutar cuando abra el formulario
+window.addEventListener(
+  'load',
+  iniciarVinculacionKYC
+);
+</script>
+
+</body>
+</html>

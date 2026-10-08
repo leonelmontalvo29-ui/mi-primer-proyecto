@@ -1,0 +1,139 @@
+ const MAPA_KYC = {
+
+  Fecha_registro: 'Fecha',
+
+  Nombre_completo:
+    'Nombre completo  Nombres sin abreviaturas apellido paterno apellido materno  Razón Social',
+
+  Fecha_nacimiento:
+    'Fecha de nacimiento  Constitución ddmmaaaa',
+
+  RFC:
+    'RFC con homoclave',
+
+  Pais_nacimiento:
+    'Pais de nacimiento  Constitución',
+
+  Entidad_nacimiento:
+    'Entidad federativa de nacimiento  constitucion',
+
+  Pais_residencia:
+    'País de residencia',
+
+  Nacionalidad:
+    'Nacionalidad',
+
+  Genero:
+    'Género',
+
+  CURP:
+    'CURP',
+
+  Ocupacion:
+    'Ocupación Profesión',
+
+  Actividad_economica:
+    'Actividad económica que desempeña  Giro empresarial detallado',
+
+  FIEL:
+    'FIEL',
+
+  Numero_identificacion_fiscal:
+    'Numero de Identificación Fiscal',
+
+  Pais_identificacion_fiscal:
+    'Pais que lo asigna',
+
+  Telefono_fijo:
+    'Teléfono fijo',
+
+  Telefono_celular:
+    'Teléfono celular opcional',
+
+  Correo:
+    'Correo electrónico',
+
+  Estado_civil:
+    'Estado civil',
+
+  Forma_migratoria:
+    'Tipo y numero de Forma Migratoria Solo aplica para extranjeros',
+
+  Apoderado_legal:
+    'Nombre completo del apoderado legal  Nombres sin abreviaturas apellido paterno apellido materno',
+
+  Nacionalidad_representante:
+    'Nacionalidad del Representante Legal',
+
+  Calle:
+    'Calle  Avenida  Vía',
+
+  Numero_exterior:
+    'Número exterior',
+
+  Numero_interior:
+    'Número interior',
+
+  Municipio:
+    'Delegación  Municipio',
+
+  Ciudad:
+    'Ciudad  Población',
+
+  Colonia:
+    'Colonia  Urbanización',
+
+  Estado:
+    'Estado  Provincia',
+
+  Pais:
+    'País  Entidad federativa',
+
+  Codigo_postal:
+    'Código postal',
+
+  Motivo_operacion_Mexico:
+    'En caso de no ser residente en México especificar las razones por las que decidió celebrar créditos o servicios con Factor GFC en México',
+
+  Nombre_acreditado:
+    'Nombre  Razón social del acreditado bajo el cual se solicitó el crédito o servicio con Factor GFC Global Informacion general de la solicitud de credito No se deberán dejar espacios en blanco En caso de no aplicar alguna casilla marcar con NA No Aplica',
+
+  Tipo_importe_credito:
+    'Tipo e importe delos créditos o servicio solicitado a Factor GFC Global',
+
+  Destino_credito:
+    'Especificar para que será destinado el recurso proveniente del crédito o servicio solicitado a Factor GFC',
+
+  Detalle_credito:
+    'De ser así especificar por que importe son y bajo que tipoRow1'
+};
+const MAPA_CASILLAS_KYC = {
+
+  // Tipo de persona
+  Persona_Fisica: 'Casilla de verificación100',
+  Persona_Moral: 'Casilla de verificación101',
+
+  // Clasificación / participación
+  Obligado_Solidario_Aval: 'Casilla de verificación102',
+  Garante: 'Casilla de verificación103',
+  Representante_Legal: 'Casilla de verificación104',
+  Propietario_Real: 'Casilla de verificación105',
+  Proveedor_Recursos: 'Casilla de verificación106',
+  Coacreditado: 'Casilla de verificación107',
+
+  // ¿Tiene créditos vigentes con Factor GFC?
+  Creditos_Vigentes_SI: 'Casilla de verificación108',
+  Creditos_Vigentes_NO: 'Casilla de verificación109',
+
+  // ¿Desempeña o desempeñó cargo público?
+  Cargo_Publico_SI: 'Casilla de verificación112',
+  Cargo_Publico_NO: 'Casilla de verificación113',
+
+  // ¿Cónyuge o familiar desempeña/desempeñó cargo público?
+  Familiar_Cargo_Publico_SI: 'Casilla de verificación114',
+  Familiar_Cargo_Publico_NO: 'Casilla de verificación115',
+
+  // Página 2 - autorización para mercadeo
+  Mercadeo_SI: 'Casilla de verificación48',
+  Mercadeo_NO: 'Casilla de verificación49'
+};

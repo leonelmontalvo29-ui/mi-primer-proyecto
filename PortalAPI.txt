@@ -1,0 +1,286 @@
+/**
+ * PRUEBA DE CONEXIÓN
+ * Portal del Cliente → Apps Script
+ */
+
+function doGet(e) {
+  try {
+
+    const accion =
+      e && e.parameter
+        ? e.parameter.accion
+        : null;
+
+    // ==========================================
+    // CREAR NUEVA SOLICITUD
+    // ==========================================
+    if (accion === 'crearSolicitud') {
+
+  const idSolicitud =
+    generarIdSolicitudPortal();
+
+  const carpetaDriveId =
+    crearCarpetaSolicitud(idSolicitud);
+
+  return ContentService
+    .createTextOutput(
+      JSON.stringify({
+        ok: true,
+        accion: 'crearSolicitud',
+        idSolicitud: idSolicitud,
+        carpetaDriveId: carpetaDriveId,
+        mensaje: 'Solicitud creada correctamente'
+      })
+    )
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+    // ==========================================
+    // PRUEBA NORMAL DE CONEXIÓN
+    // ==========================================
+    return ContentService
+      .createTextOutput(
+        JSON.stringify({
+          ok: true,
+          sistema: 'Factor GFC - Portal de Crédito',
+          mensaje: 'Conexión con Apps Script correcta'
+        })
+      )
+      .setMimeType(ContentService.MimeType.JSON);
+
+  } catch (error) {
+
+    return ContentService
+      .createTextOutput(
+        JSON.stringify({
+          ok: false,
+          mensaje: error.message
+        })
+      )
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+ /*** PRUEBA DE SUBIDA
+ * Portal del Cliente → Apps Script → Google Drive
+ */
+/***
+ * SUBIDA DE DOCUMENTOS
+ * Portal del Cliente → Apps Script → Google Drive
+ */
+function doPost(e) {
+  try {
+
+    const CARPETA_RAIZ_ID = '18nIiRg2CjIZDrSy9cEZ4uZXw3AIqYPfs';
+
+    // ==========================================
+    // 1. RECIBIR DATOS DEL PORTAL
+    // ==========================================
+    const datos = JSON.parse(e.postData.contents);
+
+    if (!datos.archivoBase64 || !datos.nombreArchivo) {
+      throw new Error('No se recibió un archivo válido.');
+    }
+
+    if (!datos.idSolicitud) {
+      throw new Error('No se recibió el ID de la solicitud.');
+    }
+
+
+    // ==========================================
+    // 2. OBTENER CARPETA RAÍZ
+    // ==========================================
+    const carpetaRaiz =
+      DriveApp.getFolderById(CARPETA_RAIZ_ID);
+
+
+    // ==========================================
+    // 3. BUSCAR CARPETA DE LA SOLICITUD
+    // Ejemplo: SOL-2026-0004
+    // ==========================================
+    const carpetasSolicitud =
+      carpetaRaiz.getFoldersByName(datos.idSolicitud);
+
+    if (!carpetasSolicitud.hasNext()) {
+      throw new Error(
+        'No existe la carpeta de la solicitud: ' +
+        datos.idSolicitud
+      );
+    }
+
+    const carpetaSolicitud =
+      carpetasSolicitud.next();
+
+
+    // ==========================================
+    // 4. BUSCAR SUBCARPETA "Documentos"
+    // ==========================================
+    const carpetasDocumentos =
+      carpetaSolicitud.getFoldersByName('Documentos');
+
+    if (!carpetasDocumentos.hasNext()) {
+      throw new Error(
+        'No existe la carpeta Documentos de la solicitud: ' +
+        datos.idSolicitud
+      );
+    }
+
+    const carpetaDocumentos =
+      carpetasDocumentos.next();
+
+
+    // ==========================================
+    // 5. BUSCAR O CREAR CARPETA DEL DOCUMENTO
+    // Ejemplo: "Constancia de Situación Fiscal"
+    // ==========================================
+    const nombreDocumento =
+      datos.documento || 'Documento sin clasificar';
+
+    const carpetasTipoDocumento =
+      carpetaDocumentos.getFoldersByName(nombreDocumento);
+
+    const carpetaTipoDocumento =
+      carpetasTipoDocumento.hasNext()
+        ? carpetasTipoDocumento.next()
+        : carpetaDocumentos.createFolder(nombreDocumento);
+
+
+    // ==========================================
+    // 6. PREPARAR ARCHIVO BASE64
+    // ==========================================
+    const base64Limpio =
+      datos.archivoBase64.includes(',')
+        ? datos.archivoBase64.split(',')[1]
+        : datos.archivoBase64;
+
+    const bytes =
+      Utilities.base64Decode(base64Limpio);
+
+    const blob =
+      Utilities.newBlob(
+        bytes,
+        datos.tipoMime || 'application/pdf',
+        datos.nombreArchivo
+      );
+
+
+    // ==========================================
+    // 7. GENERAR NOMBRE AUTOMÁTICO
+    // ==========================================
+
+    const nombrePersona =
+      datos.personalidad || 'Sin nombre';
+
+    // Obtener extensión del archivo original
+    const partesNombre =
+      datos.nombreArchivo.split('.');
+
+    const extension =
+      partesNombre.length > 1
+        ? '.' + partesNombre.pop().toLowerCase()
+        : '';
+
+
+    // ==========================================
+    // 8. CONTAR VERSIONES EXISTENTES
+    // ==========================================
+    const archivosExistentes =
+      carpetaTipoDocumento.getFiles();
+
+    let cantidad = 0;
+
+    while (archivosExistentes.hasNext()) {
+      archivosExistentes.next();
+      cantidad++;
+    }
+
+    const version = cantidad + 1;
+
+
+    // ==========================================
+    // 9. CONSTRUIR NOMBRE FINAL
+    // ==========================================
+    let nombreFinal =
+      nombreDocumento + ' - ' +
+      nombrePersona + ' - ' +
+      version;
+
+    if (version > 1) {
+      nombreFinal += ' (ACTUALIZACION)';
+    }
+
+    nombreFinal += extension;
+
+
+    // ==========================================
+    // 10. RENOMBRAR Y GUARDAR EN DRIVE
+    // ==========================================
+    blob.setName(nombreFinal);
+
+    const archivo =
+      carpetaTipoDocumento.createFile(blob);
+
+
+    // ==========================================
+    // 11. RESPONDER AL PORTAL
+    // ==========================================
+    return ContentService
+      .createTextOutput(
+        JSON.stringify({
+          ok: true,
+          mensaje: 'Archivo guardado correctamente en Drive',
+          nombreArchivo: archivo.getName(),
+          archivoId: archivo.getId(),
+          carpetaId: carpetaTipoDocumento.getId(),
+          version: version
+        })
+      )
+      .setMimeType(ContentService.MimeType.JSON);
+
+
+  } catch (error) {
+
+    return ContentService
+      .createTextOutput(
+        JSON.stringify({
+          ok: false,
+          mensaje: error.message
+        })
+      )
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+/**
+ * Genera un ID único para una nueva solicitud del portal.
+ * Ejemplo: SOL-2026-0001
+ */
+function generarIdSolicitudPortal() {
+
+  const props = PropertiesService.getScriptProperties();
+
+  const anio = new Date().getFullYear();
+
+  const clave = 'CONSECUTIVO_SOLICITUD_' + anio;
+
+  const ultimo = Number(
+    props.getProperty(clave) || 0
+  );
+
+  const siguiente = ultimo + 1;
+
+  props.setProperty(
+    clave,
+    String(siguiente)
+  );
+
+  const consecutivo =
+    String(siguiente).padStart(4, '0');
+
+  return 'SOL-' + anio + '-' + consecutivo;
+}
+function probarGenerarIdSolicitudPortal() {
+
+  const id = generarIdSolicitudPortal();
+
+  console.log('ID generado: ' + id);
+
+}

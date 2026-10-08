@@ -1,0 +1,633 @@
+/**
+ * ============================================================
+ * KYC.gs
+ * Integración KYC con:
+ *
+ * CLIENTE → CRÉDITO → PERSONALIDAD → KYC
+ *
+ * IMPORTANTE:
+ * Un KYC NO crea un crédito ni una solicitud nueva.
+ * El KYC pertenece a una personalidad ya existente.
+ * ============================================================
+ */
+
+
+/**
+ * Abre el formulario KYC.
+ */
+function abrirFormularioKYC() {
+
+  const html = HtmlService
+    .createHtmlOutputFromFile('FormularioKYC')
+    .setWidth(900)
+    .setHeight(650);
+
+  SpreadsheetApp.getUi().showModalDialog(
+    html,
+    'Conocimiento del Cliente - KYC'
+  );
+}
+
+
+/**
+ * ============================================================
+ * CLIENTES
+ * ============================================================
+ */
+
+function obtenerClientesKYC() {
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const hoja = ss.getSheetByName('Clientes');
+
+  if (!hoja || hoja.getLastRow() < 2) {
+    return [];
+  }
+
+  const datos = hoja.getDataRange().getValues();
+  const encabezados = datos[0];
+
+  const colId = encabezados.indexOf('ID_Cliente');
+  const colNombre = encabezados.indexOf('Nombre del cliente');
+
+  if (colId === -1 || colNombre === -1) {
+    throw new Error(
+      'La hoja Clientes debe contener las columnas ID_Cliente y Nombre del cliente.'
+    );
+  }
+
+  const clientes = [];
+
+  for (let i = 1; i < datos.length; i++) {
+
+    if (!datos[i][colId]) continue;
+
+    clientes.push({
+      id: String(datos[i][colId]),
+      nombre: String(datos[i][colNombre] || '')
+    });
+  }
+
+  return clientes;
+}
+
+
+/**
+ * ============================================================
+ * CRÉDITOS
+ * ============================================================
+ */
+
+function obtenerCreditosKYC(idCliente) {
+
+  if (!idCliente) return [];
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const hoja = ss.getSheetByName('Créditos');
+
+  if (!hoja || hoja.getLastRow() < 2) {
+    return [];
+  }
+
+  const datos = hoja.getDataRange().getValues();
+  const encabezados = datos[0];
+
+  const colId = encabezados.indexOf('ID');
+  const colNombre = encabezados.indexOf('Nombre del crédito');
+  const colCliente = encabezados.indexOf('ID_Cliente');
+
+  if (
+    colId === -1 ||
+    colNombre === -1 ||
+    colCliente === -1
+  ) {
+    throw new Error(
+      'La hoja Créditos no contiene los encabezados esperados.'
+    );
+  }
+
+  const creditos = [];
+
+  for (let i = 1; i < datos.length; i++) {
+
+    if (
+      String(datos[i][colCliente]) !== String(idCliente)
+    ) {
+      continue;
+    }
+
+    creditos.push({
+      id: String(datos[i][colId]),
+      nombre: String(datos[i][colNombre] || '')
+    });
+  }
+
+  return creditos;
+}
+
+
+/**
+ * ============================================================
+ * PERSONALIDADES
+ * ============================================================
+ */
+
+function obtenerPersonalidadesKYC(idCredito) {
+
+  if (!idCredito) return [];
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const hoja = ss.getSheetByName('Personalidades');
+
+  if (!hoja || hoja.getLastRow() < 2) {
+    return [];
+  }
+
+  const datos = hoja.getDataRange().getValues();
+  const encabezados = datos[0];
+
+  const colId = encabezados.indexOf('ID');
+  const colCredito = encabezados.indexOf('ID_Crédito');
+  const colNombre = encabezados.indexOf('Nombre de la personalidad');
+  const colTipo = encabezados.indexOf('Tipo');
+
+  if (
+    colId === -1 ||
+    colCredito === -1 ||
+    colNombre === -1
+  ) {
+    throw new Error(
+      'La hoja Personalidades no contiene los encabezados esperados.'
+    );
+  }
+
+  const personalidades = [];
+
+  for (let i = 1; i < datos.length; i++) {
+
+    if (
+      String(datos[i][colCredito]) !== String(idCredito)
+    ) {
+      continue;
+    }
+
+    personalidades.push({
+      id: String(datos[i][colId]),
+      nombre: String(datos[i][colNombre] || ''),
+      tipo: colTipo !== -1
+        ? String(datos[i][colTipo] || '')
+        : ''
+    });
+  }
+
+  return personalidades;
+}
+
+
+/**
+ * ============================================================
+ * GUARDAR KYC
+ * ============================================================
+ *
+ * Ahora el formulario deberá enviar:
+ *
+ * datos.idCliente
+ * datos.idCredito
+ * datos.idPersonalidad
+ *
+ * además de los datos normales del KYC.
+ *
+ * NO genera ID_Solicitud.
+ * ============================================================
+ */
+
+function guardarDatosKYC(datos) {
+
+  if (!datos) {
+    throw new Error('No se recibieron datos del formulario.');
+  }
+
+  if (!datos.idCliente) {
+    throw new Error('Debe seleccionar un cliente.');
+  }
+
+  if (!datos.idCredito) {
+    throw new Error('Debe seleccionar un crédito.');
+  }
+
+  if (!datos.idPersonalidad) {
+    throw new Error('Debe seleccionar una personalidad.');
+  }
+
+
+  // ----------------------------------------------------------
+  // Verificar que la relación realmente exista
+  // ----------------------------------------------------------
+
+  const relacion = validarRelacionKYC_(
+    datos.idCliente,
+    datos.idCredito,
+    datos.idPersonalidad
+  );
+
+  if (!relacion.ok) {
+    throw new Error(relacion.mensaje);
+  }
+
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  let hoja = ss.getSheetByName('DatosKYC');
+
+
+  // ----------------------------------------------------------
+  // Crear DatosKYC solamente si no existe.
+  // ----------------------------------------------------------
+
+  if (!hoja) {
+
+    hoja = ss.insertSheet('DatosKYC');
+
+    hoja.appendRow([
+      'ID_KYC',
+      'Fecha_registro',
+
+      'ID_Cliente',
+      'ID_Crédito',
+      'ID_Personalidad',
+
+      'Tipo_personalidad',
+      'Nombre_personalidad',
+
+      'Tipo_persona',
+      'Obligado_solidario',
+      'Representante_legal',
+      'Proveedor_recursos',
+      'Garante',
+      'Propietario_real',
+      'Coacreditado',
+
+      'Nombre_completo',
+      'Fecha_nacimiento',
+      'RFC',
+      'Pais_nacimiento',
+      'Entidad_nacimiento',
+      'Pais_residencia',
+      'Motivo_operacion_Mexico',
+      'Nacionalidad',
+      'Genero',
+      'CURP',
+      'Ocupacion',
+      'Actividad_economica',
+      'FIEL',
+      'Numero_identificacion_fiscal',
+      'Pais_identificacion_fiscal',
+      'Forma_migratoria',
+      'Telefono_fijo',
+      'Telefono_celular',
+      'Correo',
+      'Estado_civil',
+      'Apoderado_legal',
+      'Nacionalidad_representante',
+
+      'Calle',
+      'Numero_exterior',
+      'Numero_interior',
+      'Municipio',
+      'Ciudad',
+      'Colonia',
+      'Estado',
+      'Pais',
+      'Codigo_postal',
+
+      'Nombre_acreditado',
+      'Tipo_importe_credito',
+      'Destino_credito',
+      'Creditos_vigentes',
+      'Detalle_credito',
+
+      'Razon_propietario_real',
+      'Razon_proveedor_recursos',
+
+      'Cargo_publico',
+      'Cargo_publico_detalle',
+
+      'Familiar_cargo_publico',
+      'Familiar_cargo_detalle'
+    ]);
+  }
+
+
+  // ----------------------------------------------------------
+  // Generar ID exclusivo para ESTE KYC
+  // ----------------------------------------------------------
+
+  const idKYC = generarIDKYC_();
+
+
+  // ----------------------------------------------------------
+  // Guardar
+  // ----------------------------------------------------------
+
+  hoja.appendRow([
+
+    idKYC,
+    new Date(),
+
+    datos.idCliente,
+    datos.idCredito,
+    datos.idPersonalidad,
+
+    relacion.tipoPersonalidad,
+    relacion.nombrePersonalidad,
+
+    datos.tipoPersona || '',
+    datos.obligadoSolidario || '',
+    datos.representanteLegal || '',
+    datos.proveedorRecursos || '',
+    datos.garante || '',
+    datos.propietarioReal || '',
+    datos.coacreditado || '',
+
+    datos.nombreCompleto || '',
+    datos.fechaNacimiento || '',
+    datos.rfc || '',
+    datos.paisNacimiento || '',
+    datos.entidadNacimiento || '',
+    datos.paisResidencia || '',
+    datos.motivoMexico || 'N/A',
+    datos.nacionalidad || '',
+    datos.genero || '',
+    datos.curp || '',
+    datos.ocupacion || '',
+    datos.actividadEconomica || '',
+    datos.fiel || 'N/A',
+    datos.numeroIdentificacionFiscal || 'N/A',
+    datos.paisIdentificacionFiscal || 'N/A',
+    datos.formaMigratoria || 'N/A',
+    datos.telefonoFijo || 'N/A',
+    datos.telefonoCelular || '',
+    datos.correoElectronico || '',
+    datos.estadoCivil || '',
+    datos.apoderadoLegal || 'N/A',
+    datos.nacionalidadRepresentante || 'N/A',
+
+    datos.calle || '',
+    datos.numeroExterior || '',
+    datos.numeroInterior || 'N/A',
+    datos.municipio || '',
+    datos.ciudad || '',
+    datos.colonia || '',
+    datos.estado || '',
+    datos.pais || '',
+    datos.codigoPostal || '',
+
+    datos.nombreAcreditado || '',
+    datos.tipoImporteCredito || '',
+    datos.destinoCredito || '',
+    datos.creditosVigentes || '',
+    datos.detalleCredito || 'N/A',
+
+    datos.razonPropietarioReal || 'N/A',
+    datos.razonProveedorRecursos || 'N/A',
+
+    datos.cargoPublico || '',
+    datos.cargoPublicoDetalle || 'N/A',
+
+    datos.familiarCargoPublico || '',
+    datos.familiarCargoDetalle || 'N/A'
+  ]);
+
+
+  return {
+    ok: true,
+
+    idKYC: idKYC,
+
+    idCliente: String(datos.idCliente),
+    idCredito: String(datos.idCredito),
+    idPersonalidad: String(datos.idPersonalidad),
+
+    nombrePersonalidad: relacion.nombrePersonalidad,
+    tipoPersonalidad: relacion.tipoPersonalidad,
+
+    mensaje: 'KYC guardado correctamente'
+  };
+}
+
+
+/**
+ * ============================================================
+ * VALIDAR RELACIÓN
+ *
+ * Comprueba:
+ *
+ * Cliente
+ *    ↓
+ * Crédito
+ *    ↓
+ * Personalidad
+ *
+ * Esto evita guardar un KYC en una combinación incorrecta.
+ * ============================================================
+ */
+
+function validarRelacionKYC_(
+  idCliente,
+  idCredito,
+  idPersonalidad
+) {
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+
+  // ----------------------------------------------------------
+  // Verificar crédito
+  // ----------------------------------------------------------
+
+  const hojaCreditos = ss.getSheetByName('Créditos');
+
+  if (!hojaCreditos) {
+    return {
+      ok: false,
+      mensaje: 'No existe la hoja Créditos.'
+    };
+  }
+
+  const creditos = hojaCreditos
+    .getDataRange()
+    .getValues();
+
+  const encabezadosC = creditos[0];
+
+  const cId = encabezadosC.indexOf('ID');
+  const cCliente = encabezadosC.indexOf('ID_Cliente');
+
+  let creditoValido = false;
+
+  for (let i = 1; i < creditos.length; i++) {
+
+    if (
+      String(creditos[i][cId]) === String(idCredito) &&
+      String(creditos[i][cCliente]) === String(idCliente)
+    ) {
+
+      creditoValido = true;
+      break;
+    }
+  }
+
+  if (!creditoValido) {
+
+    return {
+      ok: false,
+      mensaje:
+        'El crédito seleccionado no pertenece al cliente seleccionado.'
+    };
+  }
+
+
+  // ----------------------------------------------------------
+  // Verificar personalidad
+  // ----------------------------------------------------------
+
+  const hojaPersonalidades =
+    ss.getSheetByName('Personalidades');
+
+  if (!hojaPersonalidades) {
+
+    return {
+      ok: false,
+      mensaje: 'No existe la hoja Personalidades.'
+    };
+  }
+
+  const personas =
+    hojaPersonalidades.getDataRange().getValues();
+
+  const encabezadosP = personas[0];
+
+  const pId = encabezadosP.indexOf('ID');
+  const pCredito = encabezadosP.indexOf('ID_Crédito');
+  const pNombre =
+    encabezadosP.indexOf('Nombre de la personalidad');
+  const pTipo =
+    encabezadosP.indexOf('Tipo');
+
+  for (let i = 1; i < personas.length; i++) {
+
+    if (
+      String(personas[i][pId]) ===
+        String(idPersonalidad) &&
+
+      String(personas[i][pCredito]) ===
+        String(idCredito)
+    ) {
+
+      return {
+        ok: true,
+
+        nombrePersonalidad:
+          String(personas[i][pNombre] || ''),
+
+        tipoPersonalidad:
+          pTipo !== -1
+            ? String(personas[i][pTipo] || '')
+            : ''
+      };
+    }
+  }
+
+
+  return {
+    ok: false,
+    mensaje:
+      'La personalidad seleccionada no pertenece al crédito seleccionado.'
+  };
+}
+
+
+/**
+ * ============================================================
+ * GENERADOR ID KYC
+ *
+ * Ejemplo:
+ *
+ * KYC-2026-0001
+ * KYC-2026-0002
+ * KYC-2026-0003
+ * ============================================================
+ */
+
+function generarIDKYC_() {
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const hoja = ss.getSheetByName('DatosKYC');
+
+  const anio = new Date().getFullYear();
+
+  const prefijo = 'KYC-' + anio + '-';
+
+  let consecutivo = 1;
+
+
+  if (hoja && hoja.getLastRow() >= 2) {
+
+    const ids = hoja
+      .getRange(
+        2,
+        1,
+        hoja.getLastRow() - 1,
+        1
+      )
+      .getValues()
+      .flat();
+
+
+    const numeros = ids
+      .filter(function(id) {
+
+        return String(id)
+          .startsWith(prefijo);
+
+      })
+      .map(function(id) {
+
+        return Number(
+          String(id).replace(prefijo, '')
+        );
+
+      })
+      .filter(function(numero) {
+
+        return !isNaN(numero);
+
+      });
+
+
+    if (numeros.length > 0) {
+
+      consecutivo =
+        Math.max.apply(null, numeros) + 1;
+    }
+  }
+
+
+  return (
+    prefijo +
+    String(consecutivo).padStart(4, '0')
+  );
+}
+/**
+ * Crea el menú KYC al abrir el archivo de Google Sheets.
+ */
+function onOpen() {
+
+  SpreadsheetApp.getUi()
+    .createMenu('KYC')
+    .addItem(
+      'Abrir formulario KYC',
+      'abrirFormularioKYC'
+    )
+    .addToUi();
+}

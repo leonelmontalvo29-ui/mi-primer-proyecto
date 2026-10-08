@@ -1,0 +1,1440 @@
+<script>
+  var _creditos = [];
+  var _clientes = [];
+
+  document.addEventListener('DOMContentLoaded', function () {
+    cargarCreditos();
+    cargarClientes();
+    cargarPersonalidades();
+    cargarDashboard();
+    document.querySelectorAll('.modal-overlay').forEach(function (ov) {
+      ov.addEventListener('click', function (e) { if (e.target === ov) ov.classList.remove('abierto'); });
+    });
+  });
+
+  // ---------- Navegación ----------
+  function cambiarTab(tab) {
+    document.querySelectorAll('.tab-panel').forEach(function (p) { p.classList.remove('activo'); });
+    document.querySelectorAll('.tab-btn').forEach(function (b) { b.classList.remove('active'); });
+    document.getElementById('tab-' + tab).classList.add('activo');
+    document.querySelector('.tab-btn[data-tab="' + tab + '"]').classList.add('active');
+    if (tab === 'resumen') resumenPopularClientes();
+  }
+
+  // ---------- Utilidades ----------
+  function esc(v) {
+    return String(v == null ? '' : v)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+  function fechaDisplay(iso) {
+    if (!iso) return '';
+    var p = String(iso).split('-');
+    return p.length === 3 ? (p[2] + '/' + p[1] + '/' + p[0]) : iso;
+  }
+  function toast(msg, esError) {
+    var t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast visible' + (esError ? ' error' : '');
+    setTimeout(function () { t.className = 'toast'; }, 4500);
+  }
+  function abrirModal(id) { document.getElementById(id).classList.add('abierto'); }
+  function cerrarModal(id) { document.getElementById(id).classList.remove('abierto'); }
+
+  function opcionesClientes(selId) {
+    var sel = document.getElementById(selId);
+    if (!sel) return;
+    sel.innerHTML = '<option value="">Selecciona…</option>' +
+      _clientes.map(function (c) { return '<option value="' + esc(c['ID_Cliente']) + '">' + esc(c['Nombre del cliente']) + '</option>'; }).join('');
+  }
+
+  // ---------- Buscadores ----------
+  function filtrarTabla(inputId, tablaId) {
+    var q = (document.getElementById(inputId).value || '').toLowerCase();
+    var t = document.getElementById(tablaId); if (!t) return;
+    var filas = t.querySelectorAll('tbody tr');
+    for (var i = 0; i < filas.length; i++) {
+      var tr = filas[i];
+      if (tr.classList.contains('grupo-credito')) { tr.style.display = ''; continue; }
+      tr.style.display = tr.textContent.toLowerCase().indexOf(q) !== -1 ? '' : 'none';
+    }
+  }
+  function filtrarTablaContenedor(inputId, contId) {
+    var q = (document.getElementById(inputId).value || '').toLowerCase();
+    var cont = document.getElementById(contId); if (!cont) return;
+    var filas = cont.querySelectorAll('table tbody tr');
+    for (var i = 0; i < filas.length; i++) {
+      filas[i].style.display = filas[i].textContent.toLowerCase().indexOf(q) !== -1 ? '' : 'none';
+    }
+  }
+  function filtrarChecklist() {
+    var q = (document.getElementById('buscar-checklist').value || '').toLowerCase();
+    var cats = document.querySelectorAll('#ck-contenido .ck-cat');
+    for (var c = 0; c < cats.length; c++) {
+      var filas = cats[c].querySelectorAll('tbody tr'), visibles = 0;
+      for (var i = 0; i < filas.length; i++) {
+        var ok = filas[i].textContent.toLowerCase().indexOf(q) !== -1;
+        filas[i].style.display = ok ? '' : 'none';
+        if (ok) visibles++;
+      }
+      cats[c].style.display = (q && visibles === 0) ? 'none' : '';
+    }
+  }
+
+  // =========================================================
+  //  CLIENTES
+  // =========================================================
+  function cargarClientes() {
+    google.script.run
+      .withSuccessHandler(function (cli) { _clientes = cli || []; pintarClientes(); })
+      .withFailureHandler(function (err) { toast('Error al cargar clientes: ' + err.message, true); })
+      .obtenerClientes();
+  }
+  function pintarClientes() {
+    var tbody = document.querySelector('#tabla-clientes tbody');
+    if (!tbody) return;
+    if (_clientes.length === 0) { tbody.innerHTML = '<tr><td colspan="3" class="vacio">Aún no hay clientes registrados.</td></tr>'; return; }
+    tbody.innerHTML = _clientes.map(function (c) {
+      return '<tr>' +
+        '<td>' + esc(c['ID_Cliente']) + '</td>' +
+        '<td>' + esc(c['Nombre del cliente']) + '</td>' +
+        '<td><div class="acciones">' +
+          '<button class="btn btn-ghost btn-sm" onclick="editarCliente(' + c['ID_Cliente'] + ')">Editar</button>' +
+          '<button class="btn btn-warn btn-sm" onclick="eliminarCliente(' + c['ID_Cliente'] + ')">Eliminar</button>' +
+        '</div></td>' +
+      '</tr>';
+    }).join('');
+  }
+  function abrirFormCliente() {
+    document.getElementById('titulo-modal-cliente').textContent = 'Nuevo cliente';
+    document.getElementById('cliente-id').value = '';
+    document.getElementById('cliente-nombre').value = '';
+    abrirModal('modal-cliente');
+  }
+  function editarCliente(id) {
+    var c = _clientes.filter(function (x) { return String(x['ID_Cliente']) === String(id); })[0];
+    if (!c) return;
+    document.getElementById('titulo-modal-cliente').textContent = 'Editar cliente';
+    document.getElementById('cliente-id').value = c['ID_Cliente'];
+    document.getElementById('cliente-nombre').value = c['Nombre del cliente'] || '';
+    abrirModal('modal-cliente');
+  }
+  function guardarCliente() {
+    var id = document.getElementById('cliente-id').value;
+    var nombre = document.getElementById('cliente-nombre').value.trim();
+    if (!nombre) { toast('El nombre del cliente es obligatorio.', true); return; }
+    var btn = document.getElementById('btn-guardar-cliente');
+    btn.disabled = true; btn.textContent = 'Guardando…';
+    var handler = google.script.run
+      .withSuccessHandler(function () { btn.disabled = false; btn.textContent = 'Guardar'; cerrarModal('modal-cliente'); toast(id ? 'Cliente actualizado.' : 'Cliente creado.'); cargarClientes(); cargarCreditos(); })
+      .withFailureHandler(function (err) { btn.disabled = false; btn.textContent = 'Guardar'; toast('Error: ' + err.message, true); });
+    if (id) handler.actualizarCliente(id, nombre); else handler.crearCliente(nombre);
+  }
+  function eliminarCliente(id) {
+    var c = _clientes.filter(function (x) { return String(x['ID_Cliente']) === String(id); })[0];
+    var nombre = c ? c['Nombre del cliente'] : ('#' + id);
+    if (!confirm('¿Eliminar al cliente "' + nombre + '"?\n\nSi no tiene créditos activos, se eliminarán también sus personalidades y checklists asociados.')) return;
+    google.script.run
+      .withSuccessHandler(function (res) {
+        if (res && res.ok) { toast('Cliente eliminado (' + res.personalidadesBorradas + ' personalidad(es), ' + res.checklistBorrados + ' fila(s) de checklist).'); cargarClientes(); cargarPersonalidades(); }
+        else { toast((res && res.mensaje) ? res.mensaje : 'No se pudo eliminar.', true); }
+      })
+      .withFailureHandler(function (err) { toast('Error: ' + err.message, true); })
+      .eliminarCliente(id);
+  }
+
+  // =========================================================
+  //  CRÉDITOS
+  // =========================================================
+  function cargarCreditos() {
+    google.script.run
+      .withSuccessHandler(pintarCreditos)
+      .withFailureHandler(function (err) { toast('Error al cargar créditos: ' + err.message, true); })
+      .obtenerCreditos();
+  }
+  function pintarCreditos(creditos) {
+    _creditos = creditos || [];
+    var tbody = document.querySelector('#tabla-creditos tbody');
+    if (_creditos.length === 0) { tbody.innerHTML = '<tr><td colspan="6" class="vacio">Aún no hay créditos registrados.</td></tr>'; return; }
+    tbody.innerHTML = _creditos.map(function (c) {
+      var activo = String(c['Estado']).toLowerCase() === 'activo';
+      var badge = '<span class="estado ' + (activo ? 'estado-activo' : 'estado-inactivo') + '">' + esc(c['Estado']) + '</span>';
+      var btnDesactivar = activo ? '<button class="btn btn-warn btn-sm" onclick="desactivarCredito(' + c['ID'] + ')">Desactivar</button>' : '';
+      return '<tr>' +
+        '<td>' + esc(c['ID']) + '</td>' +
+        '<td>' + esc(c['Nombre del crédito']) + '</td>' +
+        '<td>' + esc(c['Cliente']) + '</td>' +
+        '<td>' + esc(fechaDisplay(c['Fecha de inicio'])) + '</td>' +
+        '<td>' + badge + '</td>' +
+        '<td><div class="acciones">' +
+          '<button class="btn btn-ghost btn-sm" onclick="editarCredito(' + c['ID'] + ')">Editar</button>' + btnDesactivar +
+        '</div></td>' +
+      '</tr>';
+    }).join('');
+  }
+  function abrirFormCredito() {
+    if (_clientes.length === 0) { toast('Primero registra al menos un cliente.', true); return; }
+    document.getElementById('titulo-modal-credito').textContent = 'Nuevo crédito';
+    document.getElementById('credito-id').value = '';
+    document.getElementById('lbl-credito-cliente').style.display = '';
+    document.getElementById('nota-credito').style.display = '';
+    opcionesClientes('credito-cliente');
+    document.getElementById('credito-cliente').disabled = false;
+    document.getElementById('credito-nombre').value = '';
+    document.getElementById('credito-fecha').value = '';
+    abrirModal('modal-credito');
+  }
+  function editarCredito(id) {
+    var c = _creditos.filter(function (x) { return String(x['ID']) === String(id); })[0];
+    if (!c) return;
+    document.getElementById('titulo-modal-credito').textContent = 'Editar crédito';
+    document.getElementById('credito-id').value = c['ID'];
+    document.getElementById('lbl-credito-cliente').style.display = 'none';
+    document.getElementById('nota-credito').style.display = 'none';
+    document.getElementById('credito-nombre').value = c['Nombre del crédito'] || '';
+    document.getElementById('credito-fecha').value = c['Fecha de inicio'] || '';
+    abrirModal('modal-credito');
+  }
+  function guardarCredito() {
+    var id = document.getElementById('credito-id').value;
+    var btn = document.getElementById('btn-guardar-credito');
+    if (id) {
+      var datosU = { nombre: document.getElementById('credito-nombre').value.trim(), fechaInicio: document.getElementById('credito-fecha').value };
+      if (!datosU.nombre) { toast('El nombre del crédito es obligatorio.', true); return; }
+      btn.disabled = true; btn.textContent = 'Guardando…';
+      google.script.run
+        .withSuccessHandler(function () { btn.disabled = false; btn.textContent = 'Guardar'; cerrarModal('modal-credito'); toast('Crédito actualizado.'); cargarCreditos(); })
+        .withFailureHandler(function (err) { btn.disabled = false; btn.textContent = 'Guardar'; toast('Error: ' + err.message, true); })
+        .actualizarCredito(id, datosU);
+      return;
+    }
+    var datos = { idCliente: document.getElementById('credito-cliente').value, nombre: document.getElementById('credito-nombre').value.trim(), fechaInicio: document.getElementById('credito-fecha').value };
+    if (!datos.idCliente || !datos.nombre) { toast('Cliente y Nombre son obligatorios.', true); return; }
+    btn.disabled = true; btn.textContent = 'Guardando…';
+    google.script.run
+      .withSuccessHandler(function (res) { btn.disabled = false; btn.textContent = 'Guardar'; cerrarModal('modal-credito'); toast('Crédito creado. Personalidades heredadas: ' + res.personalidadesHeredadas + '.'); cargarCreditos(); })
+      .withFailureHandler(function (err) { btn.disabled = false; btn.textContent = 'Guardar'; toast('Error: ' + err.message, true); })
+      .crearCredito(datos);
+  }
+  function desactivarCredito(id) {
+    if (!confirm('¿Desactivar este crédito? Su estado pasará a "Inactivo".')) return;
+    google.script.run
+      .withSuccessHandler(function () { toast('Crédito desactivado.'); cargarCreditos(); })
+      .withFailureHandler(function (err) { toast('Error: ' + err.message, true); })
+      .desactivarCredito(id);
+  }
+
+  // =========================================================
+  //  PERSONALIDADES
+  // =========================================================
+  var _personalidades = [];
+  function cargarPersonalidades() {
+    google.script.run
+      .withSuccessHandler(pintarPersonalidades)
+      .withFailureHandler(function (err) { toast('Error al cargar personalidades: ' + err.message, true); })
+      .obtenerPersonalidades();
+  }
+  function pintarPersonalidades(personalidades) {
+    _personalidades = personalidades || [];
+    var tbody = document.querySelector('#tabla-personalidades tbody');
+    if (_personalidades.length === 0) { tbody.innerHTML = '<tr><td colspan="4" class="vacio">Aún no hay personalidades registradas.</td></tr>'; return; }
+    var html = '';
+    var clienteActual = null;
+    _personalidades.forEach(function (p) {
+      var cli = String(p['Cliente']);
+      if (cli !== clienteActual) { clienteActual = cli; html += '<tr class="grupo-credito"><td colspan="4">👥 ' + esc(cli) + '</td></tr>'; }
+      html += '<tr>' +
+        '<td>' + esc(p['ID']) + '</td>' +
+        '<td>' + esc(p['Nombre']) + (p['Vinculo'] ? ' <small style="color:#8a6d00">— ' + esc(p['Vinculo']) + '</small>' : '') + '</td>' +
+        '<td>' + esc(p['Tipo']) + '</td>' +
+        '<td><div class="acciones">' +
+          '<button class="btn btn-ghost btn-sm" onclick="editarPersonalidad(' + p['ID'] + ')">Editar</button>' +
+          '<button class="btn btn-warn btn-sm" onclick="eliminarPersonalidad(' + p['ID'] + ')">Eliminar</button>' +
+        '</div></td>' +
+      '</tr>';
+    });
+    tbody.innerHTML = html;
+  }
+  function fmtTiposSeleccionados() {
+    return Array.prototype.slice.call(document.querySelectorAll('#personalidad-tipos .pt-chk'))
+      .filter(function (c) { return c.checked; }).map(function (c) { return c.value; });
+  }
+  function fmtSetTipos(tipoStr) {
+    var sel = String(tipoStr || '').split(',').map(function (t) { return t.trim().toLowerCase(); });
+    document.querySelectorAll('#personalidad-tipos .pt-chk').forEach(function (c) {
+      c.checked = sel.indexOf(c.value.toLowerCase()) !== -1;
+    });
+  }
+  function pPopularPadres(idCliente, excluirId, seleccionado) {
+    var sel = document.getElementById('personalidad-padre');
+    var opts = (_personalidades || []).filter(function (p) {
+      return String(p['ID_Cliente']) === String(idCliente) && String(p['ID']) !== String(excluirId || '');
+    });
+    sel.innerHTML = '<option value="">— Directo del acreditado —</option>' +
+      opts.map(function (p) { return '<option value="' + esc(p['ID']) + '">' + esc(p['Nombre']) + ' (' + esc(p['Tipo']) + ')</option>'; }).join('');
+    if (seleccionado) sel.value = String(seleccionado);
+  }
+  function abrirFormPersonalidad() {
+    if (_clientes.length === 0) { toast('Primero registra al menos un cliente.', true); return; }
+    document.getElementById('titulo-modal-personalidad').textContent = 'Nueva personalidad';
+    document.getElementById('personalidad-id').value = '';
+    document.getElementById('lbl-personalidad-cliente').style.display = '';
+    document.getElementById('nota-personalidad').style.display = '';
+    document.getElementById('nota-personalidad').textContent = 'Marca todos los roles que tenga esta persona. Los documentos se combinan sin repetirse.';
+    opcionesClientes('personalidad-cliente');
+    var selCli = document.getElementById('personalidad-cliente');
+    selCli.disabled = false; selCli.value = '';
+    selCli.onchange = function () { pPopularPadres(selCli.value, '', ''); };
+    document.getElementById('personalidad-nombre').value = '';
+    fmtSetTipos('');
+    pPopularPadres('', '', '');
+    abrirModal('modal-personalidad');
+  }
+  function editarPersonalidad(id) {
+    var p = _personalidades.filter(function (x) { return String(x['ID']) === String(id); })[0];
+    if (!p) return;
+    document.getElementById('titulo-modal-personalidad').textContent = 'Editar personalidad';
+    document.getElementById('personalidad-id').value = p['ID'];
+    document.getElementById('lbl-personalidad-cliente').style.display = 'none';
+    document.getElementById('nota-personalidad').style.display = '';
+    document.getElementById('nota-personalidad').textContent = 'Si agregas roles, se añadirán solo los documentos que falten. Nunca se borra lo ya registrado.';
+    document.getElementById('personalidad-nombre').value = p['Nombre'] || '';
+    fmtSetTipos(p['Tipo']);
+    pPopularPadres(p['ID_Cliente'], p['ID'], p['PerteneceA']);
+    abrirModal('modal-personalidad');
+  }
+  function guardarPersonalidad() {
+    var id = document.getElementById('personalidad-id').value;
+    var nombre = document.getElementById('personalidad-nombre').value.trim();
+    var tipos = fmtTiposSeleccionados();
+    var padre = document.getElementById('personalidad-padre').value;
+    var btn = document.getElementById('btn-guardar-personalidad');
+    if (!nombre || tipos.length === 0) { toast('Nombre y al menos un Tipo son obligatorios.', true); return; }
+    var tipo = tipos.join(', ');
+    btn.disabled = true; btn.textContent = 'Guardando…';
+    if (id) {
+      google.script.run
+        .withSuccessHandler(function (res) { btn.disabled = false; btn.textContent = 'Guardar'; cerrarModal('modal-personalidad'); toast('Personalidad actualizada. Documentos agregados: ' + res.documentosAgregados + '.'); cargarPersonalidades(); })
+        .withFailureHandler(function (err) { btn.disabled = false; btn.textContent = 'Guardar'; toast('Error: ' + err.message, true); })
+        .actualizarPersonalidad(id, { nombre: nombre, tipo: tipo, perteneceA: padre });
+      return;
+    }
+    var datos = { idCliente: document.getElementById('personalidad-cliente').value, nombre: nombre, tipo: tipo, perteneceA: padre };
+    if (!datos.idCliente) { toast('Selecciona un cliente.', true); return; }
+    google.script.run
+      .withSuccessHandler(function (res) { btn.disabled = false; btn.textContent = 'Guardar'; cerrarModal('modal-personalidad'); toast('Personalidad creada. Documentos generados en ' + res.creditos + ' crédito(s).'); cargarPersonalidades(); })
+      .withFailureHandler(function (err) { btn.disabled = false; btn.textContent = 'Guardar'; toast('Error: ' + err.message, true); })
+      .crearPersonalidad(datos);
+  }
+  function eliminarPersonalidad(id) {
+    var p = _personalidades.filter(function (x) { return String(x['ID']) === String(id); })[0];
+    var nombre = p ? p['Nombre'] : ('#' + id);
+    if (!confirm('¿Eliminar la personalidad "' + nombre + '"?\n\nSe borrarán también sus filas del checklist en todos los créditos.')) return;
+    google.script.run
+      .withSuccessHandler(function (res) { toast('Personalidad eliminada. Se borraron ' + res.checklistBorrados + ' fila(s) del checklist.'); cargarPersonalidades(); })
+      .withFailureHandler(function (err) { toast('Error: ' + err.message, true); })
+      .eliminarPersonalidad(id);
+  }
+
+  // =========================================================
+  //  CHECKLIST
+  // =========================================================
+  var _ckClienteId = '', _ckCreditoId = '', _ckPersonalidadId = '', _ckItems = [];
+
+  function ckPopularClientes() {
+    var sel = document.getElementById('ck-cliente');
+    var actual = sel.value;
+    opcionesClientes('ck-cliente');
+    if (actual) sel.value = actual;
+  }
+  function ckLimpiarContenido(msg) {
+    document.getElementById('ck-progreso').style.display = 'none';
+    document.getElementById('ck-contenido').innerHTML = '<p class="vacio">' + msg + '</p>';
+  }
+  function ckSeleccionarCliente() {
+    _ckClienteId = document.getElementById('ck-cliente').value;
+    _ckCreditoId = ''; _ckPersonalidadId = '';
+    var selC = document.getElementById('ck-credito');
+    var selP = document.getElementById('ck-personalidad');
+    selC.value = ''; selP.value = '';
+    ckLimpiarContenido('Selecciona un crédito y una personalidad para ver el checklist.');
+    if (!_ckClienteId) {
+      selC.disabled = true; selC.innerHTML = '<option value="">Selecciona un cliente primero…</option>';
+      selP.disabled = true; selP.innerHTML = '<option value="">Selecciona un crédito primero…</option>';
+      return;
+    }
+    selC.disabled = true; selC.innerHTML = '<option value="">Cargando…</option>';
+    google.script.run
+      .withSuccessHandler(function (creditos) {
+        if (!creditos || creditos.length === 0) { selC.innerHTML = '<option value="">(Sin créditos)</option>'; selC.disabled = true; }
+        else { selC.innerHTML = '<option value="">Selecciona…</option>' + creditos.map(function (c) { return '<option value="' + esc(c['ID']) + '">' + esc(c['Nombre del crédito']) + ' (' + esc(c['Estado']) + ')</option>'; }).join(''); selC.disabled = false; }
+      })
+      .withFailureHandler(function (err) { selC.innerHTML = '<option value="">Error</option>'; toast('Error: ' + err.message, true); })
+      .obtenerCreditosPorCliente(_ckClienteId, false);
+    selP.disabled = true; selP.innerHTML = '<option value="">Cargando…</option>';
+    google.script.run
+      .withSuccessHandler(function (personalidades) {
+        if (!personalidades || personalidades.length === 0) { selP.innerHTML = '<option value="">(Este cliente no tiene personalidades)</option>'; selP.disabled = true; }
+        else { selP.innerHTML = '<option value="">Selecciona…</option>' + personalidades.map(function (p) { return '<option value="' + esc(p['ID']) + '">' + esc(p['Etiqueta']) + ' (' + esc(p['Tipo']) + ')</option>'; }).join(''); selP.disabled = false; }
+      })
+      .withFailureHandler(function (err) { selP.innerHTML = '<option value="">Error</option>'; toast('Error: ' + err.message, true); })
+      .obtenerPersonalidadesPorCliente(_ckClienteId);
+  }
+  function ckSeleccionarCredito() {
+    _ckCreditoId = document.getElementById('ck-credito').value;
+    if (!_ckCreditoId) { ckLimpiarContenido('Selecciona un crédito y una personalidad para ver el checklist.'); return; }
+    if (_ckPersonalidadId) ckCargarChecklist(); else ckCargarAutorizacion();
+  }
+  function ckSeleccionarPersonalidad() {
+    _ckPersonalidadId = document.getElementById('ck-personalidad').value;
+    if (!_ckCreditoId) { ckLimpiarContenido('Selecciona un crédito.'); return; }
+    if (_ckPersonalidadId) ckCargarChecklist(); else ckCargarAutorizacion();
+  }
+  function ckCargarAutorizacion() {
+    document.getElementById('ck-progreso').style.display = 'none';
+    document.getElementById('ck-contenido').innerHTML = '<p class="cargando">Cargando documentos del crédito…</p>';
+    google.script.run
+      .withSuccessHandler(function (res) { _ckItems = (res && res.autorizacion) ? res.autorizacion : []; ckRenderizar(); })
+      .withFailureHandler(function (err) { document.getElementById('ck-contenido').innerHTML = '<p class="vacio">Error al cargar.</p>'; toast('Error: ' + err.message, true); })
+      .obtenerChecklistCredito(_ckCreditoId);
+  }
+  function ckCargarChecklist() {
+    document.getElementById('ck-progreso').style.display = 'none';
+    document.getElementById('ck-contenido').innerHTML = '<p class="cargando">Cargando checklist…</p>';
+    google.script.run
+      .withSuccessHandler(function (res) {
+        var aut = (res && res.autorizacion) ? res.autorizacion : [];
+        var items = (res && res.items) ? res.items : [];
+        _ckItems = aut.concat(items);
+        ckRenderizar();
+      })
+      .withFailureHandler(function (err) { document.getElementById('ck-contenido').innerHTML = '<p class="vacio">Error al cargar el checklist.</p>'; toast('Error: ' + err.message, true); })
+      .obtenerChecklist(_ckCreditoId, _ckPersonalidadId);
+  }
+  function ckRenderizar() {
+    var cont = document.getElementById('ck-contenido');
+    if (!_ckItems || _ckItems.length === 0) { document.getElementById('ck-progreso').style.display = 'none'; cont.innerHTML = '<p class="vacio">No hay documentos para mostrar.</p>'; return; }
+    ckRenderProgreso();
+    var grupos = ckAgruparPorCategoria(_ckItems);
+    cont.innerHTML = grupos.map(function (g) {
+      var esAut = g.categoria.toUpperCase().indexOf('AUTORIZ') !== -1;
+      var titulo = esAut ? ('📁 Documentos del Crédito · ' + g.categoria) : g.categoria;
+      var filas = g.items.map(ckHtmlFila).join('');
+      return '<div class="ck-cat' + (esAut ? ' ck-cat-credito' : '') + '">' +
+        '<button class="ck-cat-header" onclick="ckToggleCat(this)"><span class="ck-cat-arrow">▾</span><span class="ck-cat-nombre">' + esc(titulo) + '</span><span class="ck-cat-count">' + g.items.length + (g.items.length === 1 ? ' doc' : ' docs') + '</span></button>' +
+        '<div class="ck-cat-body"><table class="ck-tabla">' +
+          '<thead><tr><th>Documento</th><th>Estado</th><th>Archivo</th><th>Fecha del documento</th><th>Entrega</th><th>Comentarios</th><th>Resp.</th><th>Acciones</th></tr></thead>' +
+          '<tbody>' + filas + '</tbody></table></div></div>';
+    }).join('');
+  }
+  function ckAgruparPorCategoria(items) {
+    var grupos = [], indice = {};
+    items.forEach(function (it) {
+      var cat = it.categoria || 'Sin categoría';
+      if (!(cat in indice)) { indice[cat] = grupos.length; grupos.push({ categoria: cat, items: [] }); }
+      grupos[indice[cat]].items.push(it);
+    });
+    return grupos;
+  }
+    function ckHtmlFila(item) {
+    var efectivo = ckEstadoEfectivo(item);
+    var clase = ckClaseEstado(efectivo);
+    var idDoc = item.idDocumento;
+    var oblig = String(item.obligatorio).toLowerCase() === 'sí';
+    var vig = Number(item.vigenciaMeses) || 0;
+    var mostrarFecha = vig > 0;
+    var fechaDoc = ckFechaDocumento(item);
+    var hintVenc = (mostrarFecha && item.fechaVencimiento) ? `<span class="ck-venc-hint">Vence: ${esc(fechaDisplay(item.fechaVencimiento))} (${vig} m)</span>` : '';
+    var celdaFecha = mostrarFecha ? `<input type="date" value="${esc(fechaDoc)}" onblur="ckCambiarFechaDocumento(${idDoc}, this.value)">${hintVenc}` : `<span class="ck-na">No requiere</span>`;
+    var avisoVenc = ckEstaVencido(item) ? `<span class="ck-vencido-aviso">⚠ Vencido</span>` : '';
+    var celdaArchivo =
+      `<div style="display:flex;flex-direction:column;gap:3px;white-space:nowrap">` +
+        `<label style="font-size:11px;font-weight:600;color:${item.fisico ? '#137333' : '#9aa0a6'};cursor:pointer">` +
+          `<input type="checkbox" ${item.fisico ? 'checked' : ''} onchange="ckToggleArchivo(${idDoc},'fisico',this.checked)"> 📄 Físico</label>` +
+        `<label style="font-size:11px;font-weight:600;color:${item.digital ? '#137333' : '#9aa0a6'};cursor:pointer">` +
+          `<input type="checkbox" ${item.digital ? 'checked' : ''} onchange="ckToggleArchivo(${idDoc},'digital',this.checked)"> 💾 Digital</label>` +
+      `</div>`;
+    return `<tr id="ck-fila-${idDoc}" class="ck-fila ${clase}">
+      <td class="ck-doc">${esc(item.nombre)}${oblig ? ' <span class="ck-oblig" title="Obligatorio">*</span>' : ''}</td>
+      <td><span class="ck-badge ${clase}">${esc(efectivo)}</span> ${avisoVenc}</td>
+      <td>${celdaArchivo}</td>
+      <td>${celdaFecha}</td>
+      <td><input type="date" value="${esc(item.fechaEntrega)}" onblur="ckActualizarCampo(${idDoc}, 'fechaEntrega', this.value)"></td>
+      <td><input type="text" class="ck-coment" value="${esc(item.comentarios)}" placeholder="—" onchange="ckActualizarCampo(${idDoc}, 'comentarios', this.value)"></td>
+      <td><span class="ck-resp">${esc(item.responsable)}</span></td>
+      <td><div class="ck-acciones">
+        <button class="ck-btn-est" title="Entregado" onclick="ckCambiarEstado(${idDoc}, 'Entregado')">✅</button>
+        <button class="ck-btn-est" title="Pendiente" onclick="ckCambiarEstado(${idDoc}, 'Pendiente')">⏳</button>
+        <button class="ck-btn-est" title="No aplica" onclick="ckCambiarEstado(${idDoc}, 'No aplica')">🚫</button>
+      </div></td>
+    </tr>`;
+  }
+  function ckClaseEstado(estado) {
+    switch (String(estado).toLowerCase()) {
+      case 'entregado': return 'est-entregado';
+      case 'vencido': return 'est-vencido';
+      case 'no aplica': return 'est-noaplica';
+      default: return 'est-pendiente';
+    }
+  }
+  function ckEstaVencido(item) {
+    if (!item.fechaVencimiento) return false;
+    if (String(item.estado).toLowerCase() === 'no aplica') return false;
+    var venc = ckParseFecha(item.fechaVencimiento);
+    if (!venc) return false;
+    var hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+    return venc < hoy;
+  }
+  function ckEstadoEfectivo(item) { if (ckEstaVencido(item)) return 'Vencido'; return item.estado || 'Pendiente'; }
+  function ckParseFecha(iso) {
+    var p = String(iso).split('-');
+    if (p.length !== 3) return null;
+    var y = Number(p[0]), m = Number(p[1]), d = Number(p[2]);
+    if (!y || !m || !d) return null;
+    var dt = new Date(y, m - 1, d); dt.setHours(0, 0, 0, 0); return dt;
+  }
+  function ckFechaISO(d) { var mm = ('0' + (d.getMonth() + 1)).slice(-2), dd = ('0' + d.getDate()).slice(-2); return d.getFullYear() + '-' + mm + '-' + dd; }
+  function ckHoyISO() { return ckFechaISO(new Date()); }
+  function ckSumarMeses(iso, meses) {
+    var d = ckParseFecha(iso);
+    if (!d) return '';
+    var dia = d.getDate();
+    d.setDate(1); d.setMonth(d.getMonth() + meses);
+    var maxDia = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+    d.setDate(Math.min(dia, maxDia));
+    return ckFechaISO(d);
+  }
+  function ckFechaDocumento(item) {
+    var vig = Number(item.vigenciaMeses) || 0;
+    if (vig <= 0 || !item.fechaVencimiento) return '';
+    return ckSumarMeses(item.fechaVencimiento, -vig);
+  }
+  function ckToggleCat(btn) { btn.parentElement.classList.toggle('cerrado'); }
+   function ckRenderProgreso() {
+    var cont = document.getElementById('ck-progreso');
+    cont.style.display = 'block';
+    var total = _ckItems.length;
+    var c = { entregado: 0, pendiente: 0, vencido: 0, noaplica: 0 };
+    _ckItems.forEach(function (it) {
+      var e = ckEstadoEfectivo(it).toLowerCase();
+      if (e === 'entregado') c.entregado++;
+      else if (e === 'vencido') c.vencido++;
+      else if (e === 'no aplica') c.noaplica++;
+      else c.pendiente++;
+    });
+
+    var fd = { fisico: 0, digital: 0, base: 0 };
+    _ckItems.forEach(function (it) {
+      if (ckEstadoEfectivo(it).toLowerCase() === 'no aplica') return;
+      fd.base++; if (it.fisico) fd.fisico++; if (it.digital) fd.digital++;
+    });
+    var pctF = fd.base > 0 ? Math.round(fd.fisico / fd.base * 100) : 0;
+    var pctD = fd.base > 0 ? Math.round(fd.digital / fd.base * 100) : 0;
+
+    var base = total - c.noaplica;
+    var pct = base > 0 ? Math.round((c.entregado / base) * 100) : 0;
+    var w = function (n) { return base > 0 ? (n / base * 100) : 0; };
+
+    cont.innerHTML =
+      '<div class="ck-prog-top">' +
+        '<span class="ck-prog-pct">' + pct + '% completado</span>' +
+        '<span class="ck-prog-total">' + c.entregado + ' de ' + base + ' documentos aplicables entregados</span>' +
+      '</div>' +
+      '<div class="ck-prog-bar">' +
+        '<div class="seg seg-entregado" style="width:' + w(c.entregado) + '%"></div>' +
+        '<div class="seg seg-vencido" style="width:' + w(c.vencido) + '%"></div>' +
+        '<div class="seg seg-pendiente" style="width:' + w(c.pendiente) + '%"></div>' +
+      '</div>' +
+      '<div class="ck-prog-stats">' +
+        '<span class="chip chip-entregado">✅ Entregados: ' + c.entregado + '</span>' +
+        '<span class="chip chip-pendiente">⏳ Pendientes: ' + c.pendiente + '</span>' +
+        '<span class="chip chip-vencido">❌ Vencidos: ' + c.vencido + '</span>' +
+        '<span class="chip chip-noaplica">🚫 No aplica: ' + c.noaplica + '</span>' +
+        '<span class="chip chip-total">Σ Total: ' + total + '</span>' +
+        '<span class="chip" style="background:#e8f0fe;color:#1a3a8f">📄 Físico: ' + fd.fisico + '/' + fd.base + ' (' + pctF + '%)</span>' +
+        '<span class="chip" style="background:#e6f4ea;color:#137333">💾 Digital: ' + fd.digital + '/' + fd.base + ' (' + pctD + '%)</span>' +
+      '</div>';
+  }
+  function ckItemPorDoc(idDoc) { return _ckItems.filter(function (it) { return String(it.idDocumento) === String(idDoc); })[0]; }
+  function ckCambiarEstado(idDoc, estado) {
+    var item = ckItemPorDoc(idDoc); if (!item) return;
+    item.estado = estado;
+    if (estado === 'Entregado' && !item.fechaEntrega) item.fechaEntrega = ckHoyISO();
+    ckActualizarFila(idDoc); ckRenderProgreso(); ckGuardarItem(item);
+  }
+    function ckToggleArchivo(idDoc, tipo, valor) {
+    var item = ckItemPorDoc(idDoc); if (!item) return;
+    item[tipo] = !!valor;
+    ckRenderProgreso(); ckGuardarItem(item);
+  }
+  function ckCambiarFechaDocumento(idDoc, valor) {
+    var item = ckItemPorDoc(idDoc); if (!item) return;
+    var vig = Number(item.vigenciaMeses) || 0;
+    var nuevoVenc = (valor && vig > 0) ? ckSumarMeses(valor, vig) : '';
+    if (nuevoVenc === (item.fechaVencimiento || '')) return;
+    item.fechaVencimiento = nuevoVenc;
+    ckActualizarFila(idDoc); ckRenderProgreso(); ckGuardarItem(item);
+  }
+  function ckActualizarCampo(idDoc, campo, valor) {
+    var item = ckItemPorDoc(idDoc); if (!item) return;
+    if ((item[campo] || '') === (valor || '')) return;
+    item[campo] = valor; ckGuardarItem(item);
+  }
+  function ckActualizarFila(idDoc) {
+    var item = ckItemPorDoc(idDoc); if (!item) return;
+    var fila = document.getElementById('ck-fila-' + idDoc);
+    if (fila) fila.outerHTML = ckHtmlFila(item);
+  }
+  function ckGuardarItem(item) {
+    var datos = { idChecklist: item.idChecklist, idCredito: _ckCreditoId, idPersonalidad: (item.idPersonalidad == null ? 0 : item.idPersonalidad), idDocumento: item.idDocumento, estado: item.estado, fechaVencimiento: item.fechaVencimiento || '', fechaEntrega: item.fechaEntrega || '', comentarios: item.comentarios || '', fisico: !!item.fisico, digital: !!item.digital };
+    ckMarcarGuardando(true);
+    google.script.run
+      .withSuccessHandler(function (res) { if (res && res.idChecklist) item.idChecklist = res.idChecklist; ckMarcarGuardando(false); })
+      .withFailureHandler(function (err) { ckMarcarGuardando(false); toast('Error al guardar: ' + err.message + '. Recargando…', true); if (_ckPersonalidadId) ckCargarChecklist(); else ckCargarAutorizacion(); })
+      .guardarItemChecklist(datos);
+  }
+  function ckMarcarGuardando(enProgreso) {
+    var el = document.getElementById('ck-guardado'); if (!el) return;
+    if (enProgreso) { el.textContent = 'Guardando…'; el.className = 'ck-guardado guardando'; }
+    else { el.textContent = '✓ Guardado'; el.className = 'ck-guardado ok'; }
+  }
+
+  // =========================================================
+  //  DASHBOARD
+  // =========================================================
+  var _chartsReady = false;
+  var _dashPendingDraw = null;
+  document.addEventListener('DOMContentLoaded', function () {
+    if (window.google && google.charts) {
+      google.charts.load('current', { packages: ['corechart'] });
+      google.charts.setOnLoadCallback(function () { _chartsReady = true; if (_dashPendingDraw) { dibujarPie(_dashPendingDraw); _dashPendingDraw = null; } });
+    }
+  });
+  function cargarDashboard() {
+    var tbody = document.querySelector('#dash-tabla tbody');
+    if (tbody) tbody.innerHTML = '<tr><td colspan="5" class="cargando">Cargando…</td></tr>';
+    google.script.run.withSuccessHandler(pintarDashboard).withFailureHandler(function (err) { toast('Error al cargar el dashboard: ' + err.message, true); }).obtenerDashboardStats();
+    cargarDashAlertas();
+  }
+  function pintarDashboard(stats) {
+    document.getElementById('dash-card-creditos').textContent = stats.totalCreditosActivos;
+    document.getElementById('dash-card-pct').textContent = stats.pctGlobal + '%';
+    var tbody = document.querySelector('#dash-tabla tbody');
+    if (!stats.creditos || stats.creditos.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" class="vacio">No hay créditos activos con documentos.</td></tr>';
+    } else {
+      tbody.innerHTML = stats.creditos.map(function (c) {
+        return '<tr><td>' + esc(c.nombre) + '</td><td>' + esc(c.cliente) + '</td><td class="dash-pct-cell">' + c.pct + '%</td><td class="dash-bar-cell">' + dashBarraHTML(c) + '</td><td><button class="btn btn-primary btn-sm" onclick="dashVerChecklist(' + c.id + ')">Ver checklist</button></td></tr>';
+      }).join('');
+    }
+    dashDibujarGrafica(stats.conteoGlobal);
+  }
+  function dashBarraHTML(c) {
+    var base = (typeof c.base === 'number') ? c.base : ((c.total || 0) - (c.conteo ? c.conteo.noaplica : 0));
+    if (base <= 0) return '<div class="dash-bar"><span class="dash-bar-empty">Sin documentos aplicables</span></div>';
+    var w = function (n) { return (n / base * 100); };
+    return '<div class="dash-bar"><div class="seg seg-entregado" style="width:' + w(c.conteo.entregado) + '%"></div><div class="seg seg-vencido" style="width:' + w(c.conteo.vencido) + '%"></div><div class="seg seg-pendiente" style="width:' + w(c.conteo.pendiente) + '%"></div></div>';
+  }
+  function dashVerChecklist(idCredito) {
+    var cred = _creditos.filter(function (x) { return String(x['ID']) === String(idCredito); })[0];
+    cambiarTab('checklist'); ckPopularClientes();
+    if (cred && cred['ID_Cliente'] != null) {
+      document.getElementById('ck-cliente').value = String(cred['ID_Cliente']);
+      ckSeleccionarCliente();
+      setTimeout(function () { var selC = document.getElementById('ck-credito'); if (selC) { selC.value = String(idCredito); ckSeleccionarCredito(); } }, 600);
+    }
+  }
+  function dashDibujarGrafica(conteo) {
+    var total = conteo.pendiente + conteo.entregado + conteo.vencido;
+    var cont = document.getElementById('dash-pie');
+    if (total === 0) { cont.innerHTML = '<p class="vacio">Aún no hay documentos Pendientes, Entregados o Vencidos.</p>'; _dashPendingDraw = null; return; }
+    if (_chartsReady && window.google && google.visualization) dibujarPie(conteo);
+    else { _dashPendingDraw = conteo; cont.innerHTML = '<p class="cargando">Cargando gráfica…</p>'; }
+  }
+  function dibujarPie(conteo) {
+    var cont = document.getElementById('dash-pie');
+    if (!cont || !window.google || !google.visualization) { _dashPendingDraw = conteo; return; }
+    var data = google.visualization.arrayToDataTable([['Estado', 'Documentos'], ['Pendiente', conteo.pendiente], ['Entregado', conteo.entregado], ['Vencido', conteo.vencido]]);
+    var options = { legend: { position: 'right', textStyle: { fontSize: 12 } }, chartArea: { width: '92%', height: '88%' }, colors: ['#dfe3e8', '#34a853', '#ea4335'], fontName: 'Segoe UI' };
+    new google.visualization.PieChart(cont).draw(data, options);
+  }
+// ---------- Documentos por vencer / recién vencidos (Dashboard) ----------
+  var _alertasData = null;
+  var _alertSort = { key: 'dias', dir: 1 };
+  function cargarDashAlertas() {
+    var cont = document.getElementById('dash-alertas');
+    if (!cont) return;
+    cont.innerHTML = '<p class="cargando">Cargando…</p>';
+    google.script.run
+      .withSuccessHandler(function (data) { _alertasData = data || []; pintarDashAlertas(); })
+      .withFailureHandler(function (err) { cont.innerHTML = '<p class="vacio">Error al cargar.</p>'; toast('Error: ' + err.message, true); })
+      .obtenerDocumentosPorVencer();
+  }
+  function pintarDashAlertas() {
+    var cont = document.getElementById('dash-alertas');
+    if (!cont || !_alertasData) return;
+    if (_alertasData.length === 0) { cont.innerHTML = '<p class="vacio" style="padding:14px">Nada por vencer. ✅</p>'; return; }
+    var cols = [
+      { key: 'cliente', label: 'Cliente' }, { key: 'documento', label: 'Documento' },
+      { key: 'personalidad', label: 'Personalidad' }, { key: 'dias', label: 'Estado' }
+    ];
+    var s = _alertSort;
+    var datos = _alertasData.slice().sort(function (a, b) {
+      var x = a[s.key], y = b[s.key];
+      if (s.key === 'dias') return (x - y) * s.dir;
+      x = String(x || '').toLowerCase(); y = String(y || '').toLowerCase();
+      return x < y ? -s.dir : x > y ? s.dir : 0;
+    });
+    var ths = cols.map(function (c) {
+      var fl = (s.key === c.key) ? ' ' + (s.dir > 0 ? '▲' : '▼') : '';
+      return '<th style="cursor:pointer" onclick="alertOrdenar(\'' + c.key + '\')">' + c.label + fl + '</th>';
+    }).join('');
+    var filas = datos.map(function (r) {
+      var estTxt, estClase;
+      if (r.vencido) { estTxt = 'Venció ' + Math.abs(r.dias) + 'd'; estClase = 'ck-badge est-vencido'; }
+      else if (r.dias === 0) { estTxt = 'Hoy'; estClase = 'ck-badge est-vencido'; }
+      else { estTxt = 'En ' + r.dias + 'd'; estClase = 'ck-badge est-pendiente'; }
+      return '<tr style="cursor:pointer" onclick="alertIrChecklist(' + r.idCredito + ',' + r.idPersonalidad + ')">' +
+        '<td>' + esc(r.cliente) + '</td><td>' + esc(r.documento) + '</td>' +
+        '<td>' + esc(r.personalidad) + '</td>' +
+        '<td><span class="' + estClase + '">' + esc(estTxt) + '</span></td></tr>';
+    }).join('');
+    cont.innerHTML = '<div class="tabla-wrap" style="box-shadow:none"><table class="ck-tabla" style="min-width:0"><thead><tr>' + ths + '</tr></thead><tbody>' + filas + '</tbody></table></div>';
+  }
+  function alertOrdenar(key) {
+    if (_alertSort.key === key) _alertSort.dir = -_alertSort.dir; else { _alertSort.key = key; _alertSort.dir = 1; }
+    pintarDashAlertas();
+  }
+  function alertIrChecklist(idCredito, idPersonalidad) {
+    var cred = _creditos.filter(function (x) { return String(x['ID']) === String(idCredito); })[0];
+    cambiarTab('checklist'); ckPopularClientes();
+    if (cred && cred['ID_Cliente'] != null) {
+      document.getElementById('ck-cliente').value = String(cred['ID_Cliente']);
+      ckSeleccionarCliente();
+      setTimeout(function () {
+        var selC = document.getElementById('ck-credito');
+        if (selC) { selC.value = String(idCredito); ckSeleccionarCredito(); }
+        if (idPersonalidad && idPersonalidad !== 0) {
+          setTimeout(function () {
+            var selP = document.getElementById('ck-personalidad');
+            if (selP) { selP.value = String(idPersonalidad); ckSeleccionarPersonalidad(); }
+          }, 400);
+        }
+      }, 600);
+    }
+  }
+// =========================================================
+  //  REPORTE
+  // =========================================================
+  var _repActual = null;
+
+  function ckGenerarReporte() {
+    if (!_ckCreditoId) { toast('Selecciona un cliente y un crédito primero.', true); return; }
+    var cuerpo = document.getElementById('reporte-cuerpo');
+    cuerpo.innerHTML = '<p class="cargando">Generando reporte…</p>';
+    abrirModal('modal-reporte');
+    google.script.run
+      .withSuccessHandler(function (rep) { _repActual = rep; pintarReporte(rep); })
+      .withFailureHandler(function (err) { _repActual = null; cuerpo.innerHTML = '<p class="vacio">Error al generar el reporte.</p>'; toast('Error: ' + err.message, true); })
+      .obtenerReporteCredito(_ckCreditoId);
+  }
+  function repListaDocs(docs, vacioMsg) {
+    if (!docs || docs.length === 0) return '<p class="rep-vacio">' + vacioMsg + '</p>';
+    return '<table class="rep-tabla"><thead><tr><th>Documento</th><th>Categoría</th><th>Responsable</th><th>Vence</th></tr></thead><tbody>' +
+      docs.map(function (d) {
+        var respClase = String(d.responsable).toLowerCase() === 'nosotros' ? 'rep-resp-nosotros' : 'rep-resp-cliente';
+        return '<tr><td>' + esc(d.nombre) + '</td><td>' + esc(d.categoria) + '</td><td><span class="rep-resp ' + respClase + '">' + esc(d.responsable) + '</span></td><td>' + (d.fechaVencimiento ? esc(fechaDisplay(d.fechaVencimiento)) : '—') + '</td></tr>';
+      }).join('') + '</tbody></table>';
+  }
+  function repSeccionPersonalidad(s) {
+    return '<div class="rep-personalidad">' +
+        '<h3 class="rep-pers-titulo">' + esc(s.personalidad) + '</h3>' +
+        '<p class="rep-pers-tipo">Tipo: ' + esc(s.tipo) + '</p>' +
+        '<div class="rep-resumen"><div class="rep-pct">' + s.pct + '%<small>completado</small></div>' +
+          '<div class="rep-chips">' +
+            '<span class="chip chip-entregado">Entregados: ' + s.conteo.entregado + '</span>' +
+            '<span class="chip chip-pendiente">Pendientes: ' + s.conteo.pendiente + '</span>' +
+            '<span class="chip chip-vencido">Vencidos: ' + s.conteo.vencido + '</span>' +
+            '<span class="chip chip-noaplica">No aplica: ' + s.conteo.noaplica + '</span>' +
+            '<span class="chip chip-total">Total: ' + s.total + '</span></div></div>' +
+        '<div class="rep-seccion"><h4 class="rep-h-vencido">❌ Vencidos por hacer (Nosotros) (' + s.vencidosNosotros.length + ')</h4>' + repListaDocs(s.vencidosNosotros, 'Sin vencidos a nuestro cargo.') + '</div>' +
+        '<div class="rep-seccion"><h4 class="rep-h-vencido">❌ Vencidos del Cliente (' + s.vencidosCliente.length + ')</h4>' + repListaDocs(s.vencidosCliente, 'Sin vencidos a cargo del cliente.') + '</div>' +
+        '<div class="rep-seccion"><h4 class="rep-h-nosotros">📋 Pendientes por hacer (Nosotros) (' + s.pendientesNosotros.length + ')</h4>' + repListaDocs(s.pendientesNosotros, 'Sin pendientes a nuestro cargo.') + '</div>' +
+        '<div class="rep-seccion"><h4 class="rep-h-cliente">📤 Pendientes del Cliente (' + s.pendientesCliente.length + ')</h4>' + repListaDocs(s.pendientesCliente, 'Sin pendientes a cargo del cliente.') + '</div>' +
+      '</div>';
+  }
+  function repHTML(rep) {
+    var fechaHoy = fechaDisplay(ckHoyISO());
+    var secciones = (!rep.secciones || rep.secciones.length === 0) ? '<p class="rep-vacio">Este crédito no tiene secciones.</p>' : rep.secciones.map(repSeccionPersonalidad).join('');
+    return '<div class="rep-header"><h2>Reporte de expediente</h2><span class="rep-fecha">Generado: ' + fechaHoy + '</span></div>' +
+      '<div class="rep-meta">' +
+        '<div><span class="rep-lbl">Crédito</span><span class="rep-val">' + esc(rep.credito) + '</span></div>' +
+        '<div><span class="rep-lbl">Cliente</span><span class="rep-val">' + esc(rep.cliente) + '</span></div>' +
+        '<div><span class="rep-lbl">Personalidades</span><span class="rep-val">' + rep.totalPersonalidades + '</span></div>' +
+        '<div><span class="rep-lbl">Total documentos</span><span class="rep-val">' + rep.totalGlobal.total + '</span></div></div>' +
+      '<div class="rep-resumen"><div class="rep-pct">' + rep.pctGlobal + '%<small>completado (crédito)</small></div>' +
+        '<div class="rep-chips">' +
+          '<span class="chip chip-entregado">Entregados: ' + rep.totalGlobal.entregado + '</span>' +
+          '<span class="chip chip-pendiente">Pendientes: ' + rep.totalGlobal.pendiente + '</span>' +
+          '<span class="chip chip-vencido">Vencidos: ' + rep.totalGlobal.vencido + '</span>' +
+          '<span class="chip chip-noaplica">No aplica: ' + rep.totalGlobal.noaplica + '</span>' +
+          '<span class="chip chip-total">Total: ' + rep.totalGlobal.total + '</span></div></div>' +
+      secciones;
+  }
+  function pintarReporte(rep) { document.getElementById('reporte-cuerpo').innerHTML = repHTML(rep); }
+  function ckDescargarReporte() {
+    if (!_repActual) { toast('Genera primero el reporte.', true); return; }
+    var rep = _repActual;
+    var estilos =
+      'body{font-family:"Segoe UI",Arial,sans-serif;color:#1a1a1a;max-width:800px;margin:24px auto;padding:0 16px;}' +
+      'h2{color:#1F3864;font-size:22px;margin:0;}' +
+      '.rep-header{border-bottom:2px solid #1F3864;padding-bottom:10px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:6px;}' +
+      '.rep-fecha{font-size:12px;color:#6b7280;}' +
+      '.rep-meta{display:grid;grid-template-columns:1fr 1fr;gap:8px 18px;margin-bottom:16px;}.rep-meta>div{display:flex;flex-direction:column;}' +
+      '.rep-lbl{font-size:11px;color:#9aa0a6;text-transform:uppercase;letter-spacing:.4px;font-weight:600;}.rep-val{font-size:14px;color:#1f2937;font-weight:600;}' +
+      '.rep-resumen{display:flex;align-items:center;gap:18px;background:#f7f9fc;border-radius:8px;padding:14px 16px;margin-bottom:18px;flex-wrap:wrap;}' +
+      '.rep-pct{font-size:28px;font-weight:800;color:#1F3864;display:flex;flex-direction:column;line-height:1;}.rep-pct small{font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase;}' +
+      '.rep-chips{display:flex;flex-wrap:wrap;gap:6px;}.chip{font-size:12px;font-weight:600;padding:4px 10px;border-radius:999px;}' +
+      '.chip-entregado{background:#e6f4ea;color:#137333;}.chip-pendiente{background:#f1f3f4;color:#5f6368;}.chip-vencido{background:#fce8e6;color:#c5221f;}.chip-noaplica{background:#e8eaed;color:#3c4043;}.chip-total{background:#e8f0fe;color:#1a3a8f;}' +
+      '.rep-personalidad{border:1px solid #e6e9ee;border-radius:10px;padding:16px;margin-bottom:16px;}' +
+      '.rep-pers-titulo{color:#1F3864;font-size:16px;margin:0 0 4px 0;}.rep-pers-tipo{font-size:12px;color:#6b7280;font-weight:600;margin:0 0 8px 0;}' +
+      '.rep-seccion{margin-bottom:16px;}.rep-seccion h4{font-size:13px;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid #eef0f3;}' +
+      '.rep-h-vencido{color:#c5221f;}.rep-h-nosotros{color:#1a3a8f;}.rep-h-cliente{color:#8a6d00;}.rep-vacio{font-size:13px;color:#9aa0a6;font-style:italic;}' +
+      '.rep-tabla{width:100%;border-collapse:collapse;}.rep-tabla th{text-align:left;font-size:11px;color:#6b7280;padding:6px 8px;border-bottom:1px solid #eef0f3;text-transform:uppercase;}' +
+      '.rep-tabla td{font-size:13px;padding:6px 8px;border-bottom:1px solid #f3f4f6;vertical-align:top;}' +
+      '.rep-resp{font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;}.rep-resp-nosotros{background:#e8f0fe;color:#1a3a8f;}.rep-resp-cliente{background:#fef7e0;color:#8a6d00;}';
+    var html = '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Reporte - ' + esc(rep.credito) + '</title><style>' + estilos + '</style></head><body>' + repHTML(rep) + '</body></html>';
+    var blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var nombreArchivo = ('Reporte_' + rep.credito).replace(/[^\w\u00C0-\u017F]+/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '') + '.html';
+    var a = document.createElement('a');
+    a.href = url; a.download = nombreArchivo || 'Reporte.html';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1500);
+    toast('Reporte descargado.');
+  }
+  function ckReporteCliente() {
+    if (!_ckCreditoId) { toast('Selecciona un cliente y un crédito primero.', true); return; }
+    toast('Generando reporte para cliente…');
+    google.script.run
+      .withSuccessHandler(ckDescargarReporteCliente)
+      .withFailureHandler(function (err) { toast('Error: ' + err.message, true); })
+      .obtenerReporteCliente(_ckCreditoId);
+  }
+  function ckDescargarReporteCliente(rep) {
+    function tabla(docs, vacioMsg, conVence) {
+      if (!docs || docs.length === 0) return '<p class="rep-vacio">' + vacioMsg + '</p>';
+      return '<table class="rep-tabla"><thead><tr><th>Documento</th></tr></thead><tbody>' +
+        docs.map(function (d) {
+          return '<tr><td>' + esc(d.nombre) + '</td></tr>';
+        }).join('') + '</tbody></table>';
+    }
+    function bloquePersona(p) {
+      var secciones = '';
+      if (p.vencidos.length > 0)
+        secciones += '<div class="rep-seccion"><h4 class="rep-h-vencido">❌ Documentos vencidos (' + p.vencidos.length + ')</h4>' + tabla(p.vencidos, '', true) + '</div>';
+      if (p.pendientes.length > 0)
+        secciones += '<div class="rep-seccion"><h4 class="rep-h-cliente">📤 Documentos pendientes (' + p.pendientes.length + ')</h4>' + tabla(p.pendientes, '', false) + '</div>';
+      return '<div class="rep-personalidad"><h3 class="rep-pers-titulo">' + esc(p.persona) + '</h3>' +
+        (p.tipo ? '<p class="rep-pers-tipo">' + esc(p.tipo) + '</p>' : '') + secciones + '</div>';
+    }
+    var fechaHoy = fechaDisplay(ckHoyISO());
+    var cuerpo;
+    if (!rep.personas || rep.totalDocs === 0) {
+      cuerpo = '<div class="rep-header"><h2>Documentos pendientes de entrega</h2><span class="rep-fecha">Generado: ' + fechaHoy + '</span></div>' +
+        '<div class="rep-meta"><div><span class="rep-lbl">Crédito</span><span class="rep-val">' + esc(rep.credito) + '</span></div>' +
+        '<div><span class="rep-lbl">Cliente</span><span class="rep-val">' + esc(rep.cliente) + '</span></div></div>' +
+        '<div class="rep-ok">✅ ¡Felicidades! No hay documentos pendientes ni vencidos a su cargo.</div>';
+    } else {
+      cuerpo = '<div class="rep-header"><h2>Documentos pendientes de entrega</h2><span class="rep-fecha">Generado: ' + fechaHoy + '</span></div>' +
+        '<div class="rep-meta"><div><span class="rep-lbl">Crédito</span><span class="rep-val">' + esc(rep.credito) + '</span></div>' +
+        '<div><span class="rep-lbl">Cliente</span><span class="rep-val">' + esc(rep.cliente) + '</span></div></div>' +
+        '<p class="rep-intro">Estimado cliente, a continuación le compartimos la relación de documentos pendientes y vencidos de su expediente de crédito, organizados por participante. Le agradecemos su pronto envío.</p>' +
+        rep.personas.map(bloquePersona).join('');
+    }
+    var estilos =
+      'body{font-family:"Segoe UI",Arial,sans-serif;color:#1a1a1a;max-width:820px;margin:24px auto;padding:0 16px;}' +
+      'h2{color:#1F3864;font-size:22px;margin:0;}' +
+      '.rep-header{border-bottom:2px solid #1F3864;padding-bottom:10px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:6px;}' +
+      '.rep-fecha{font-size:12px;color:#6b7280;}' +
+      '.rep-meta{display:grid;grid-template-columns:1fr 1fr;gap:8px 18px;margin-bottom:16px;}.rep-meta>div{display:flex;flex-direction:column;}' +
+      '.rep-lbl{font-size:11px;color:#9aa0a6;text-transform:uppercase;letter-spacing:.4px;font-weight:600;}.rep-val{font-size:14px;color:#1f2937;font-weight:600;}' +
+      '.rep-intro{font-size:13px;color:#374151;background:#f7f9fc;border-radius:8px;padding:12px 16px;margin-bottom:18px;line-height:1.5;}' +
+      '.rep-ok{font-size:15px;color:#137333;background:#e6f4ea;border-radius:8px;padding:18px;text-align:center;font-weight:600;}' +
+      '.rep-personalidad{border:1px solid #e6e9ee;border-radius:10px;padding:16px;margin-bottom:16px;}' +
+      '.rep-pers-titulo{color:#1F3864;font-size:16px;margin:0 0 4px 0;}.rep-pers-tipo{font-size:12px;color:#6b7280;font-weight:600;margin:0 0 10px 0;}' +
+      '.rep-seccion{margin-bottom:14px;}.rep-seccion h4{font-size:13px;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid #eef0f3;}' +
+      '.rep-h-vencido{color:#c5221f;}.rep-h-cliente{color:#8a6d00;}.rep-vacio{font-size:13px;color:#9aa0a6;font-style:italic;}' +
+      '.rep-tabla{width:100%;border-collapse:collapse;}.rep-tabla th{text-align:left;font-size:11px;color:#6b7280;padding:6px 8px;border-bottom:1px solid #eef0f3;text-transform:uppercase;}' +
+      '.rep-tabla td{font-size:13px;padding:6px 8px;border-bottom:1px solid #f3f4f6;vertical-align:top;}';
+    var html = '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Documentos pendientes - ' + esc(rep.credito) + '</title><style>' + estilos + '</style></head><body>' + cuerpo + '</body></html>';
+    var blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var nombreArchivo = ('Documentos_Cliente_' + rep.credito).replace(/[^\w\u00C0-\u017F]+/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '') + '.html';
+    var a = document.createElement('a');
+    a.href = url; a.download = nombreArchivo || 'Documentos_Cliente.html';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1500);
+    toast('Reporte para cliente descargado.');
+  }
+
+  // =========================================================
+  //  CONTROL (con dinero formateado + Referencia SIAC texto)
+  // =========================================================
+  var _ctrlClienteId = '', _ctrlCreditoId = '', _ctrlData = null;
+  var CTRL_ESTADO_OPCIONES = ['Vigente', 'Vencido', 'Liquidado'];
+  var CTRL_TIPO_OPCIONES = ['Simple', 'Revolvente', 'Quirografario', 'Reestructurado', 'Crédito Puente'];
+  var CTRL_MONEDA_OPCIONES = ['MXN', 'USD'];
+
+  function ctrlPopularClientes() { var sel = document.getElementById('ctrl-cliente'); var actual = sel.value; opcionesClientes('ctrl-cliente'); if (actual) sel.value = actual; }
+  function ctrlSeleccionarCliente() {
+    _ctrlClienteId = document.getElementById('ctrl-cliente').value;
+    _ctrlCreditoId = ''; _ctrlData = null;
+    var selC = document.getElementById('ctrl-credito');
+    selC.value = '';
+    document.getElementById('ctrl-contenido').innerHTML = '<p class="vacio">Selecciona uno de los créditos activos del cliente.</p>';
+    if (!_ctrlClienteId) { selC.disabled = true; selC.innerHTML = '<option value="">Selecciona un cliente primero…</option>'; return; }
+    selC.disabled = true; selC.innerHTML = '<option value="">Cargando…</option>';
+    google.script.run
+      .withSuccessHandler(function (creditos) {
+        if (!creditos || creditos.length === 0) { selC.innerHTML = '<option value="">(Sin créditos activos)</option>'; selC.disabled = true; }
+        else { selC.innerHTML = '<option value="">Selecciona…</option>' + creditos.map(function (c) { return '<option value="' + esc(c['ID']) + '">' + esc(c['Nombre del crédito']) + '</option>'; }).join(''); selC.disabled = false; }
+      })
+      .withFailureHandler(function (err) { selC.innerHTML = '<option value="">Error</option>'; toast('Error: ' + err.message, true); })
+      .obtenerCreditosPorCliente(_ctrlClienteId, true);
+  }
+  function ctrlSeleccionarCredito() {
+    _ctrlCreditoId = document.getElementById('ctrl-credito').value;
+    var cont = document.getElementById('ctrl-contenido');
+    if (!_ctrlCreditoId) { _ctrlData = null; cont.innerHTML = '<p class="vacio">Selecciona un crédito.</p>'; return; }
+    cont.innerHTML = '<p class="cargando">Cargando control…</p>';
+    google.script.run
+      .withSuccessHandler(function (data) { _ctrlData = data; ctrlRenderizar(); })
+      .withFailureHandler(function (err) { cont.innerHTML = '<p class="vacio">Error al cargar el control.</p>'; toast('Error: ' + err.message, true); })
+      .obtenerControlCredito(_ctrlCreditoId);
+  }
+  function ctrlVal(clave) { if (!_ctrlData) return ''; var v = _ctrlData[clave]; return (v == null) ? '' : v; }
+  function ctrlMoneda(n) {
+    var num = Number(n);
+    if (isNaN(num)) return esc(n);
+    return '$' + num.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  function ctrlDiasHasta(iso) { var d = ckParseFecha(iso); if (!d) return null; var hoy = new Date(); hoy.setHours(0, 0, 0, 0); return Math.round((d - hoy) / 86400000); }
+  function ctrlMarcarGuardando(enProgreso) {
+    var el = document.getElementById('ctrl-guardado'); if (!el) return;
+    if (enProgreso) { el.textContent = 'Guardando…'; el.className = 'ck-guardado guardando'; }
+    else { el.textContent = '✓ Guardado'; el.className = 'ck-guardado ok'; }
+  }
+  function ctrlCatHTML(titulo, icono, cuerpoHTML, cerrado) {
+    return '<div class="ctrl-cat' + (cerrado ? ' cerrado' : '') + '"><button class="ctrl-cat-header" onclick="ckToggleCat(this)"><span class="ck-cat-arrow">▾</span><span class="ctrl-cat-nombre">' + icono + ' ' + esc(titulo) + '</span></button><div class="ctrl-cat-body">' + cuerpoHTML + '</div></div>';
+  }
+  function ctrlRenderizar() {
+    var cont = document.getElementById('ctrl-contenido');
+    if (!_ctrlData) { cont.innerHTML = '<p class="vacio">Selecciona un crédito.</p>'; return; }
+    cont.innerHTML = ctrlSeccionCondiciones() + ctrlSeccionEstatus() + ctrlSeccionVencimientos() + ctrlSeccionGarantias();
+  }
+  function ctrlSeccionCondiciones() {
+    var tipoActual = String(ctrlVal('Tipo de Crédito'));
+    var tipoOps = '<option value="">Selecciona…</option>' + CTRL_TIPO_OPCIONES.map(function (o) { return '<option value="' + esc(o) + '"' + (o === tipoActual ? ' selected' : '') + '>' + esc(o) + '</option>'; }).join('');
+    var monActual = String(ctrlVal('Moneda') || 'MXN');
+    var monOps = CTRL_MONEDA_OPCIONES.map(function (o) { return '<option value="' + esc(o) + '"' + (o === monActual ? ' selected' : '') + '>' + esc(o) + '</option>'; }).join('');
+    var cuerpo =
+      '<div class="ctrl-form">' +
+        '<label>Referencia SIAC (No. Control)<input type="text" id="ctrl-ref-siac" placeholder="Ej. 000002199" value="' + esc(ctrlVal('Referencia SIAC')) + '"></label>' +
+        '<label>Tipo de Crédito<select id="ctrl-tipo-credito">' + tipoOps + '</select></label>' +
+        '<label>Moneda<select id="ctrl-moneda">' + monOps + '</select></label>' +
+        '<label>Monto Original<input type="text" id="ctrl-monto" value="' + esc(ctrlVal('Monto Original') !== '' ? ctrlMoneda(ctrlVal('Monto Original')) : '') + '"></label>' +
+        '<label>Tasa de Interés<input type="text" id="ctrl-tasa" placeholder="Ej. TIIE + 5%" value="' + esc(ctrlVal('Tasa Interés')) + '"></label>' +
+        '<label>Plazo (meses)<input type="number" id="ctrl-plazo" min="0" value="' + esc(ctrlVal('Plazo (meses)')) + '"></label>' +
+        '<label>Fecha Inicio<input type="date" id="ctrl-fecha-inicio" value="' + esc(ctrlVal('Fecha Inicio')) + '"></label>' +
+        '<label>Fecha Vencimiento Final<input type="date" id="ctrl-fecha-venc" value="' + esc(ctrlVal('Fecha Vencimiento Final')) + '"></label>' +
+      '</div>' +
+      '<div class="ctrl-form-acciones"><button class="btn btn-primary" id="btn-ctrl-condiciones" onclick="ctrlGuardarCondiciones()">Guardar Condiciones</button></div>';
+    return ctrlCatHTML('Condiciones', '📝', cuerpo, false);
+  }
+  function ctrlSeccionEstatus() {
+    var actual = String(ctrlVal('Estado General'));
+    var ops = '<option value="">Selecciona…</option>' + CTRL_ESTADO_OPCIONES.map(function (o) { return '<option value="' + esc(o) + '"' + (o === actual ? ' selected' : '') + '>' + esc(o) + '</option>'; }).join('');
+    var cuerpo =
+      '<div class="ctrl-form">' +
+        '<label>Saldo Actual<input type="text" id="ctrl-saldo" value="' + esc(ctrlVal('Saldo Actual') !== '' ? ctrlMoneda(ctrlVal('Saldo Actual')) : '') + '"></label>' +
+        '<label>Último Pago Fecha<input type="date" id="ctrl-ultimo-pago" value="' + esc(ctrlVal('Último Pago Fecha')) + '"></label>' +
+        '<label>Próximo Pago Fecha<input type="date" id="ctrl-proximo-pago" value="' + esc(ctrlVal('Próximo Pago Fecha')) + '"></label>' +
+        '<label>Estado General<select id="ctrl-estado-general">' + ops + '</select></label>' +
+      '</div>' +
+      '<div class="ctrl-form-acciones"><button class="btn btn-primary" id="btn-ctrl-estatus" onclick="ctrlGuardarEstatus()">Guardar Estatus</button></div>';
+    return ctrlCatHTML('Estatus', '📊', cuerpo, false);
+  }
+  function ctrlSeccionVencimientos() {
+    var proximo = ctrlVal('Próximo Pago Fecha');
+    var vencFinal = ctrlVal('Fecha Vencimiento Final');
+    var cards = [];
+    var dProx = ctrlDiasHasta(proximo), proxClase, proxTxt;
+    if (!proximo) { proxClase = 'ctrl-alert-gris'; proxTxt = 'Sin fecha registrada'; }
+    else if (dProx < 0) { proxClase = 'ctrl-alert-rojo'; proxTxt = fechaDisplay(proximo) + ' (vencido hace ' + Math.abs(dProx) + ' día(s))'; }
+    else if (dProx <= 7) { proxClase = 'ctrl-alert-ambar'; proxTxt = fechaDisplay(proximo) + ' (en ' + dProx + ' día(s))'; }
+    else { proxClase = 'ctrl-alert-verde'; proxTxt = fechaDisplay(proximo) + ' (en ' + dProx + ' día(s))'; }
+    cards.push('<div class="ctrl-alert ' + proxClase + '"><span class="ctrl-alert-lbl">Próximo pago</span><span class="ctrl-alert-val">' + esc(proxTxt) + '</span></div>');
+    var dFin = ctrlDiasHasta(vencFinal), finClase, finTxt;
+    if (!vencFinal) { finClase = 'ctrl-alert-gris'; finTxt = 'Sin fecha registrada'; }
+    else if (dFin < 0) { finClase = 'ctrl-alert-rojo'; finTxt = fechaDisplay(vencFinal) + ' (vencido)'; }
+    else if (dFin <= 30) { finClase = 'ctrl-alert-ambar'; finTxt = fechaDisplay(vencFinal) + ' (en ' + dFin + ' día(s))'; }
+    else { finClase = 'ctrl-alert-verde'; finTxt = fechaDisplay(vencFinal) + ' (en ' + dFin + ' día(s))'; }
+    cards.push('<div class="ctrl-alert ' + finClase + '"><span class="ctrl-alert-lbl">Vencimiento final</span><span class="ctrl-alert-val">' + esc(finTxt) + '</span></div>');
+    var cuerpo = '<div class="ctrl-alerts">' + cards.join('') + '</div><p class="ctrl-nota">Estas fechas se editan en "Condiciones" y "Estatus".</p>';
+    return ctrlCatHTML('Vencimientos', '⏰', cuerpo, false);
+  }
+  function ctrlSeccionGarantias() {
+    var garantias = (_ctrlData && _ctrlData.garantias) ? _ctrlData.garantias : [];
+    var total = garantias.reduce(function (s, g) { return s + (Number(g.valor) || 0); }, 0);
+    var filas;
+    if (garantias.length === 0) { filas = '<tr><td colspan="5" class="vacio">Aún no hay garantías registradas.</td></tr>'; }
+    else {
+      filas = garantias.map(function (g, i) {
+        var estClase = String(g.estatus).toLowerCase() === 'liberada' ? 'ctrl-gar-liberada' : 'ctrl-gar-vigente';
+        return '<tr><td>' + esc(g.tipo) + '</td><td>' + esc(g.descripcion) + '</td><td class="ctrl-gar-valor">' + ctrlMoneda(g.valor) + '</td><td><span class="ctrl-gar-estatus ' + estClase + '">' + esc(g.estatus) + '</span></td><td><button class="btn btn-warn btn-sm" onclick="ctrlEliminarGarantia(' + i + ')">Eliminar</button></td></tr>';
+      }).join('');
+    }
+    var cuerpo =
+      '<div class="ctrl-gar-top"><button class="btn btn-primary btn-sm" onclick="ctrlAbrirGarantia()">+ Agregar Garantía</button></div>' +
+      '<div class="tabla-wrap"><table class="ctrl-gar-tabla"><thead><tr><th>Tipo</th><th>Descripción</th><th>Valor</th><th>Estatus</th><th></th></tr></thead><tbody>' + filas + '</tbody></table></div>' +
+      '<div class="ctrl-gar-total">Total en garantías: <strong>' + ctrlMoneda(total) + '</strong></div>';
+    return ctrlCatHTML('Garantías', '🛡️', cuerpo, false);
+  }
+  function ctrlGuardar(datos, msgOk, btnId) {
+    if (!_ctrlCreditoId) return;
+    var btn = document.getElementById(btnId);
+    var label = btn ? btn.textContent : '';
+    if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
+    ctrlMarcarGuardando(true);
+    google.script.run
+      .withSuccessHandler(function (data) { _ctrlData = data; ctrlMarcarGuardando(false); toast(msgOk); ctrlRenderizar(); })
+      .withFailureHandler(function (err) { ctrlMarcarGuardando(false); if (btn) { btn.disabled = false; btn.textContent = label; } toast('Error: ' + err.message, true); })
+      .guardarControlCredito(_ctrlCreditoId, datos);
+  }
+  function ctrlGuardarCondiciones() {
+    if (!_ctrlCreditoId) return;
+    var datos = {
+      'Referencia SIAC': document.getElementById('ctrl-ref-siac').value.trim(),
+      'Tipo de Crédito': document.getElementById('ctrl-tipo-credito').value,
+      'Moneda': document.getElementById('ctrl-moneda').value,
+      'Monto Original': document.getElementById('ctrl-monto').value.replace(/[$,]/g, '').trim(),
+      'Tasa Interés': document.getElementById('ctrl-tasa').value.trim(),
+      'Plazo (meses)': document.getElementById('ctrl-plazo').value.trim(),
+      'Fecha Inicio': document.getElementById('ctrl-fecha-inicio').value,
+      'Fecha Vencimiento Final': document.getElementById('ctrl-fecha-venc').value
+    };
+    ctrlGuardar(datos, 'Condiciones guardadas.', 'btn-ctrl-condiciones');
+  }
+  function ctrlGuardarEstatus() {
+    if (!_ctrlCreditoId) return;
+    var datos = {
+      'Saldo Actual': document.getElementById('ctrl-saldo').value.replace(/[$,]/g, '').trim(),
+      'Último Pago Fecha': document.getElementById('ctrl-ultimo-pago').value,
+      'Próximo Pago Fecha': document.getElementById('ctrl-proximo-pago').value,
+      'Estado General': document.getElementById('ctrl-estado-general').value
+    };
+    ctrlGuardar(datos, 'Estatus guardado.', 'btn-ctrl-estatus');
+  }
+  function ctrlAbrirGarantia() {
+    if (!_ctrlCreditoId) { toast('Selecciona un crédito primero.', true); return; }
+    document.getElementById('garantia-tipo').value = 'Hipotecaria';
+    document.getElementById('garantia-descripcion').value = '';
+    document.getElementById('garantia-valor').value = '';
+    document.getElementById('garantia-estatus').value = 'Vigente';
+    abrirModal('modal-garantia');
+  }
+  function ctrlGuardarGarantia() {
+    if (!_ctrlCreditoId) return;
+    var garantia = { tipo: document.getElementById('garantia-tipo').value, descripcion: document.getElementById('garantia-descripcion').value.trim(), valor: Number(document.getElementById('garantia-valor').value) || 0, estatus: document.getElementById('garantia-estatus').value };
+    var btn = document.getElementById('btn-guardar-garantia');
+    btn.disabled = true; btn.textContent = 'Agregando…';
+    google.script.run
+      .withSuccessHandler(function (data) { _ctrlData = data; btn.disabled = false; btn.textContent = 'Agregar'; cerrarModal('modal-garantia'); toast('Garantía agregada.'); ctrlRenderizar(); })
+      .withFailureHandler(function (err) { btn.disabled = false; btn.textContent = 'Agregar'; toast('Error: ' + err.message, true); })
+      .agregarGarantia(_ctrlCreditoId, garantia);
+  }
+  function ctrlEliminarGarantia(indice) {
+    if (!_ctrlCreditoId) return;
+    if (!confirm('¿Eliminar esta garantía? Esta acción no se puede deshacer.')) return;
+    google.script.run
+      .withSuccessHandler(function (data) { _ctrlData = data; toast('Garantía eliminada.'); ctrlRenderizar(); })
+      .withFailureHandler(function (err) { toast('Error: ' + err.message, true); })
+      .eliminarGarantia(_ctrlCreditoId, indice);
+  }
+
+  // =========================================================
+  //  RESUMEN POR CLIENTE
+  // =========================================================
+  var _resumenClienteId = '';
+  function resumenPopularClientes() {
+    var dl = document.getElementById('resumen-clientes-list');
+    if (!dl) return;
+    var vistos = {};
+    dl.innerHTML = (_clientes || []).map(function (c) {
+      var nom = String(c['Nombre del cliente']);
+      var etq = vistos[nom] ? (nom + ' (#' + c['ID_Cliente'] + ')') : nom;
+      vistos[nom] = true;
+      return '<option value="' + esc(etq) + '"></option>';
+    }).join('');
+  }
+  function resumenSeleccionarCliente() {
+    var val = (document.getElementById('resumen-cliente-input').value || '').trim();
+    var cont = document.getElementById('resumen-contenido');
+    var cli = (_clientes || []).filter(function (c) {
+      var nom = String(c['Nombre del cliente']);
+      return val === nom || val === (nom + ' (#' + c['ID_Cliente'] + ')');
+    })[0];
+    if (!cli) { _resumenClienteId = ''; cont.innerHTML = '<p class="vacio">Escribe y elige un cliente de la lista.</p>'; return; }
+    if (String(cli['ID_Cliente']) === String(_resumenClienteId)) return;
+    _resumenClienteId = cli['ID_Cliente'];
+    cont.innerHTML = '<p class="cargando">Cargando resumen…</p>';
+    google.script.run
+      .withSuccessHandler(pintarResumen)
+      .withFailureHandler(function (err) { cont.innerHTML = '<p class="vacio">Error al cargar el resumen.</p>'; toast('Error: ' + err.message, true); })
+      .obtenerResumenCliente(_resumenClienteId);
+  }
+  function resumenBloque(titulo, cuerpo) {
+    return '<div class="ck-cat"><button class="ck-cat-header" onclick="ckToggleCat(this)"><span class="ck-cat-arrow">▾</span><span class="ck-cat-nombre">' + esc(titulo) + '</span></button><div class="ck-cat-body"><div class="tabla-wrap">' + cuerpo + '</div></div></div>';
+  }
+  function pintarResumen(data) {
+    var cont = document.getElementById('resumen-contenido');
+    var credRows = (data.creditos || []).map(function (c) {
+      return '<tr>' +
+        '<td>' + esc(c.nombre) + '</td>' +
+        '<td>' + esc(c.tipo || '—') + '</td>' +
+        '<td><span class="siac-moneda-badge">' + esc(c.moneda || 'MXN') + '</span></td>' +
+        '<td class="siac-num">' + (c.monto !== '' ? ctrlMoneda(c.monto) : '—') + '</td>' +
+        '<td class="siac-num">' + (c.saldo !== '' ? ctrlMoneda(c.saldo) : '—') + '</td>' +
+        '<td>' + esc(c.estado || '—') + '</td>' +
+        '<td class="dash-pct-cell">' + c.pct + '%</td>' +
+        '<td><button class="btn btn-primary btn-sm" onclick="resumenVerControl(' + c.id + ')">Ver Control</button></td>' +
+      '</tr>';
+    }).join('') || '<tr><td colspan="8" class="vacio">Sin créditos activos.</td></tr>';
+    var garRows = (data.garantias || []).map(function (g) {
+      var estClase = String(g.estatus).toLowerCase() === 'liberada' ? 'ctrl-gar-liberada' : 'ctrl-gar-vigente';
+      return '<tr><td>' + esc(g.credito) + '</td><td>' + esc(g.tipo) + '</td><td>' + esc(g.descripcion) + '</td><td class="ctrl-gar-valor">' + ctrlMoneda(g.valor) + '</td><td><span class="ctrl-gar-estatus ' + estClase + '">' + esc(g.estatus) + '</span></td></tr>';
+    }).join('') || '<tr><td colspan="5" class="vacio">Sin garantías.</td></tr>';
+    var persRows = (data.personalidades || []).map(function (p) {
+      return '<tr><td>' + esc(p.nombre) + '</td><td>' + esc(p.tipo) + '</td></tr>';
+    }).join('') || '<tr><td colspan="2" class="vacio">Sin personalidades.</td></tr>';
+    cont.innerHTML =
+      resumenBloque('💳 Créditos activos', '<table class="ck-tabla"><thead><tr><th>Crédito</th><th>Tipo</th><th>Moneda</th><th>Monto Original</th><th>Saldo Actual</th><th>Estado</th><th>% Checklist</th><th></th></tr></thead><tbody>' + credRows + '</tbody></table>') +
+      resumenBloque('🛡️ Garantías', '<table class="ck-tabla"><thead><tr><th>Crédito</th><th>Tipo</th><th>Descripción</th><th>Valor</th><th>Estatus</th></tr></thead><tbody>' + garRows + '</tbody></table>') +
+      resumenBloque('👥 Personalidades / Avales', '<table class="ck-tabla"><thead><tr><th>Nombre</th><th>Tipo</th></tr></thead><tbody>' + persRows + '</tbody></table>');
+    var b = document.getElementById('buscar-resumen');
+    if (b && b.value) filtrarTablaContenedor('buscar-resumen', 'resumen-contenido');
+  }
+  function resumenVerControl(idCredito) {
+    var cred = _creditos.filter(function (x) { return String(x['ID']) === String(idCredito); })[0];
+    cambiarTab('control'); ctrlPopularClientes();
+    if (cred && cred['ID_Cliente'] != null) {
+      document.getElementById('ctrl-cliente').value = String(cred['ID_Cliente']);
+      ctrlSeleccionarCliente();
+      setTimeout(function () { var selC = document.getElementById('ctrl-credito'); if (selC) { selC.value = String(idCredito); ctrlSeleccionarCredito(); } }, 600);
+    }
+  }
+  // =========================================================
+  //  IMPORTACIÓN SIAC + CARTERA SIAC
+  // =========================================================
+  function ctrlImportarSIAC() {
+    toast('Importando SIAC desde la hoja "SIAC_Import"…');
+    var btn = document.getElementById('btn-importar-siac');
+    if (btn) { btn.disabled = true; btn.textContent = 'Importando…'; }
+    google.script.run
+      .withSuccessHandler(function (res) {
+        if (btn) { btn.disabled = false; btn.textContent = '📥 Importar SIAC'; }
+        if (res && res.ok) { toast(res.mensaje); if (_ctrlCreditoId) ctrlSeleccionarCredito(); _siacCliente = null; cargarCarteraSIAC(); }
+        else { toast((res && res.mensaje) ? res.mensaje : 'No se pudo importar.', true); }
+      })
+      .withFailureHandler(function (err) { if (btn) { btn.disabled = false; btn.textContent = '📥 Importar SIAC'; } toast('Error al importar: ' + err.message, true); })
+      .importarSIACdesdeHoja();
+  }
+
+  var _siacVista = 'referencia', _siacData = [], _siacCliente = null;
+  var _siacSortRef = { key: 'referencia', dir: 1 };
+  var _siacSortCli = { key: 'nombre', dir: 1 };
+  var SIAC_COLS_REF = [
+    { key: 'referencia', label: 'Referencia', tipo: 'texto' },
+    { key: 'nombre', label: 'Cliente', tipo: 'texto' },
+    { key: 'tipoContrato', label: 'Tipo Contrato', tipo: 'texto' },
+    { key: 'moneda', label: 'Moneda', tipo: 'monedaBadge' },
+    { key: 'saldoTotal', label: 'Saldo Total', tipo: 'moneda' },
+    { key: 'carteraVigente', label: 'Cartera Vigente', tipo: 'moneda' },
+    { key: 'carteraVencida', label: 'Cartera Vencida', tipo: 'moneda' },
+    { key: 'imor', label: 'IMOR', tipo: 'pct' },
+    { key: 'periodosAtrasados', label: 'Per. Atrasados', tipo: 'num' },
+    { key: 'estado', label: 'Estado', tipo: 'estado' }
+  ];
+  var SIAC_COLS_CLI = [
+    { key: 'nombre', label: 'Cliente', tipo: 'texto' },
+    { key: 'moneda', label: 'Moneda', tipo: 'monedaBadge' },
+    { key: 'saldoTotal', label: 'Saldo Total', tipo: 'moneda' },
+    { key: 'carteraVigente', label: 'Cartera Vigente', tipo: 'moneda' },
+    { key: 'carteraVencida', label: 'Cartera Vencida', tipo: 'moneda' },
+    { key: 'imor', label: 'IMOR', tipo: 'pct' },
+    { key: 'periodosAtrasados', label: 'Per. Atrasados', tipo: 'num' },
+    { key: 'estado', label: 'Estado', tipo: 'estado' }
+  ];
+  function cargarCarteraSIAC() {
+    _siacVista = document.getElementById('siac-vista').value || 'referencia';
+    document.getElementById('siac-contenido').innerHTML = '<p class="cargando">Cargando cartera SIAC…</p>';
+    document.getElementById('siac-totales').innerHTML = '';
+    google.script.run
+      .withSuccessHandler(function (data) { _siacData = data || []; pintarSiacTotales(); if (_siacVista === 'cliente') cargarCarteraCliente(); else pintarCarteraSIAC(); })
+      .withFailureHandler(function (err) { document.getElementById('siac-contenido').innerHTML = '<p class="vacio">Error al cargar la cartera SIAC.</p>'; toast('Error: ' + err.message, true); })
+      .obtenerCarteraSIAC();
+  }
+  function cargarCarteraCliente() {
+    document.getElementById('siac-contenido').innerHTML = '<p class="cargando">Agrupando por cliente…</p>';
+    google.script.run
+      .withSuccessHandler(function (data) { _siacCliente = data || []; pintarCarteraSIACCliente(); })
+      .withFailureHandler(function (err) { document.getElementById('siac-contenido').innerHTML = '<p class="vacio">Error.</p>'; toast('Error: ' + err.message, true); })
+      .obtenerCarteraSIACporCliente();
+  }
+  function siacCambiarVista() {
+    _siacVista = document.getElementById('siac-vista').value;
+    if (_siacVista === 'cliente') { if (_siacCliente) pintarCarteraSIACCliente(); else cargarCarteraCliente(); }
+    else { pintarCarteraSIAC(); }
+  }
+  function pintarSiacTotales() {
+    var cont = document.getElementById('siac-totales');
+    if (!_siacData || _siacData.length === 0) { cont.innerHTML = ''; return; }
+    var porMoneda = {};
+    _siacData.forEach(function (r) {
+      var m = r.moneda || 'MXN';
+      if (!porMoneda[m]) porMoneda[m] = { saldo: 0, vigente: 0, vencida: 0 };
+      porMoneda[m].saldo += Number(r.saldoTotal) || 0;
+      porMoneda[m].vigente += Number(r.carteraVigente) || 0;
+      porMoneda[m].vencida += Number(r.carteraVencida) || 0;
+    });
+    cont.innerHTML = Object.keys(porMoneda).map(function (m) {
+      var t = porMoneda[m];
+      var imor = t.saldo > 0 ? (t.vencida / t.saldo * 100) : 0;
+      return '<div class="siac-tot-bloque"><div class="siac-tot-moneda">' + esc(m) + '</div><div class="siac-tot-cards">' +
+        '<div class="siac-tot-card"><span class="siac-tot-lbl">Saldo Total</span><span class="siac-tot-val">' + ctrlMoneda(t.saldo) + '</span></div>' +
+        '<div class="siac-tot-card"><span class="siac-tot-lbl">Cartera Vigente</span><span class="siac-tot-val verde">' + ctrlMoneda(t.vigente) + '</span></div>' +
+        '<div class="siac-tot-card"><span class="siac-tot-lbl">Cartera Vencida</span><span class="siac-tot-val rojo">' + ctrlMoneda(t.vencida) + '</span></div>' +
+        '<div class="siac-tot-card"><span class="siac-tot-lbl">IMOR Global</span><span class="siac-tot-val">' + imor.toFixed(2) + '%</span></div>' +
+        '</div></div>';
+    }).join('');
+  }
+  function siacRenderTabla(data, cols, sortState, sortFnName, rowClickFn) {
+    if (!data || data.length === 0) return '<p class="vacio">No hay datos en SIAC_Data. Pega el reporte en la hoja "SIAC_Import" y usa "📥 Importar SIAC".</p>';
+    var key = sortState.key, dir = sortState.dir;
+    var col = cols.filter(function (c) { return c.key === key; })[0] || cols[0];
+    var datos = data.slice().sort(function (a, b) {
+      var va = a[key], vb = b[key];
+      if (col.tipo === 'moneda' || col.tipo === 'pct' || col.tipo === 'num') { va = Number(va) || 0; vb = Number(vb) || 0; return (va - vb) * dir; }
+      va = String(va == null ? '' : va).toLowerCase(); vb = String(vb == null ? '' : vb).toLowerCase();
+      if (va < vb) return -1 * dir; if (va > vb) return 1 * dir; return 0;
+    });
+    var ths = cols.map(function (c) {
+      var flecha = (sortState.key === c.key) ? '<span class="siac-sort">' + (sortState.dir > 0 ? '▲' : '▼') + '</span>' : '';
+      return '<th onclick="' + sortFnName + '(\'' + c.key + '\')">' + esc(c.label) + flecha + '</th>';
+    }).join('');
+    var filas = datos.map(function (r) {
+      var onclick = rowClickFn ? ' onclick="' + rowClickFn + '(\'' + esc(r.idCredito || '') + '\')"' : '';
+      return '<tr' + onclick + '>' + cols.map(function (c) { return siacCelda(r, c); }).join('') + '</tr>';
+    }).join('');
+    return '<div class="siac-wrap"><table class="siac-tabla"><thead><tr>' + ths + '</tr></thead><tbody>' + filas + '</tbody></table></div>';
+  }
+  function pintarCarteraSIAC() {
+    document.getElementById('siac-contenido').innerHTML = siacRenderTabla(_siacData, SIAC_COLS_REF, _siacSortRef, 'siacOrdenarRef', 'siacAbrirControl');
+    var _b = document.getElementById('buscar-siac'); if (_b && _b.value) filtrarTablaContenedor('buscar-siac', 'siac-contenido');
+  }
+  function pintarCarteraSIACCliente() {
+    document.getElementById('siac-contenido').innerHTML = siacRenderTabla(_siacCliente || [], SIAC_COLS_CLI, _siacSortCli, 'siacOrdenarCli', null);
+    var _b = document.getElementById('buscar-siac'); if (_b && _b.value) filtrarTablaContenedor('buscar-siac', 'siac-contenido');
+  }
+  function siacOrdenarRef(key) { if (_siacSortRef.key === key) _siacSortRef.dir = -_siacSortRef.dir; else { _siacSortRef.key = key; _siacSortRef.dir = 1; } pintarCarteraSIAC(); }
+  function siacOrdenarCli(key) { if (_siacSortCli.key === key) _siacSortCli.dir = -_siacSortCli.dir; else { _siacSortCli.key = key; _siacSortCli.dir = 1; } pintarCarteraSIACCliente(); }
+  function siacCelda(r, col) {
+    var v = r[col.key];
+    switch (col.tipo) {
+      case 'moneda': return '<td class="siac-num">' + ctrlMoneda(Number(v) || 0) + '</td>';
+      case 'pct': return '<td class="siac-imor">' + (Number(v) || 0).toFixed(2) + '%</td>';
+      case 'num': return '<td class="siac-num">' + (Number(v) || 0) + '</td>';
+      case 'monedaBadge': var mm = String(v || 'MXN'); return '<td><span class="siac-moneda-badge">' + esc(mm) + '</span></td>';
+      case 'estado':
+        var s = String(v || '');
+        var clase = s === 'Vencido' ? 'siac-estado-mora' : (s === 'Liquidado' ? 'siac-estado-liquidado' : 'siac-estado-vigente');
+        return '<td><span class="siac-estado ' + clase + '">' + esc(s || '—') + '</span></td>';
+      default: return '<td>' + (v ? esc(v) : '—') + '</td>';
+    }
+  }
+  function siacAbrirControl(idCredito) {
+    if (!idCredito) { toast('Esta referencia no está vinculada a un crédito en Control.', true); return; }
+    var cred = _creditos.filter(function (x) { return String(x['ID']) === String(idCredito); })[0];
+    cambiarTab('control'); ctrlPopularClientes();
+    if (cred && cred['ID_Cliente'] != null) {
+      document.getElementById('ctrl-cliente').value = String(cred['ID_Cliente']);
+      ctrlSeleccionarCliente();
+      setTimeout(function () { var selC = document.getElementById('ctrl-credito'); if (selC) { selC.value = String(idCredito); ctrlSeleccionarCredito(); } }, 600);
+    }
+  }
+  function ckReporteEjecutivo() {
+    if (!_ckCreditoId) { toast('Selecciona un cliente y un crédito primero.', true); return; }
+    toast('Generando reporte ejecutivo…');
+    google.script.run
+      .withSuccessHandler(ckDescargarReporteEjecutivo)
+      .withFailureHandler(function (err) { toast('Error: ' + err.message, true); })
+      .obtenerReporteEjecutivo(_ckCreditoId);
+  }
+  function ckDescargarReporteEjecutivo(rep) {
+    var fechaHoy = fechaDisplay(ckHoyISO());
+    var filasJSON = JSON.stringify(rep.filas || []).replace(/</g, '\\u003c');
+    var cuerpo =
+      '<div class="rep-header"><h2>Reporte Ejecutivo de Expediente</h2><span class="rep-fecha">Generado: ' + fechaHoy + '</span></div>' +
+      '<div class="rep-meta">' +
+        '<div><span class="rep-lbl">Crédito</span><span class="rep-val">' + esc(rep.credito) + '</span></div>' +
+        '<div><span class="rep-lbl">Cliente</span><span class="rep-val">' + esc(rep.cliente) + '</span></div>' +
+        '<div><span class="rep-lbl">Documentos pendientes/vencidos</span><span class="rep-val">' + (rep.filas ? rep.filas.length : 0) + '</span></div></div>' +
+      '<table class="rep-tabla" id="tabla-ejec"><thead><tr>' +
+        '<th data-c="personalidad">Personalidad</th><th data-c="documento">Documento</th>' +
+        '<th data-c="estado">Estado</th><th data-c="responsable">Responsable</th><th data-c="vence">Vence</th><th data-c="comentarios">Comentarios</th>' +
+        '</tr></thead><tbody></tbody></table>' +
+      '<p class="rep-vacio" id="ejec-vacio" style="display:none">No hay documentos pendientes ni vencidos.</p>';
+    var script =
+      '<script>' +
+      'var DATOS=' + filasJSON + ';' +
+      'var dir={};' +
+      'function fdisp(s){if(!s)return "—";var p=String(s).split("-");return p.length===3?(p[2]+"/"+p[1]+"/"+p[0]):s;}' +
+      'function esc(v){return String(v==null?"":v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}' +
+      'function pinta(){' +
+        'var tb=document.querySelector("#tabla-ejec tbody");' +
+        'if(!DATOS.length){document.getElementById("tabla-ejec").style.display="none";document.getElementById("ejec-vacio").style.display="block";return;}' +
+        'tb.innerHTML=DATOS.map(function(r){var cl=r.estado==="Vencido"?"ej-venc":"ej-pend";' +
+          'return "<tr><td>"+esc(r.personalidad)+"</td><td>"+esc(r.documento)+"</td>"+' +
+          '"<td><span class=\\\"ej-badge "+cl+"\\\">"+esc(r.estado)+"</span></td><td>"+esc(r.responsable)+"</td><td>"+(r.vence?fdisp(r.vence):"—")+"</td><td>"+(r.comentarios?esc(r.comentarios):"—")+"</td></tr>";' +
+        '}).join("");}' +
+      'function ordenar(c){dir[c]=!dir[c];var s=dir[c]?1:-1;' +
+        'DATOS.sort(function(a,b){var x=String(a[c]||"").toLowerCase(),y=String(b[c]||"").toLowerCase();return x<y?-s:x>y?s:0;});pinta();}' +
+      'document.querySelectorAll("#tabla-ejec th").forEach(function(th){th.style.cursor="pointer";th.onclick=function(){ordenar(th.getAttribute("data-c"));};});' +
+      'pinta();' +
+      '<\/script>';
+    var estilos =
+      'body{font-family:"Segoe UI",Arial,sans-serif;color:#1a1a1a;max-width:1100px;margin:24px auto;padding:0 16px;}' +
+      'h2{color:#1F3864;font-size:22px;margin:0;}' +
+      '.rep-header{border-bottom:2px solid #1F3864;padding-bottom:10px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:6px;}' +
+      '.rep-fecha{font-size:12px;color:#6b7280;}' +
+      '.rep-meta{display:grid;grid-template-columns:repeat(3,1fr);gap:8px 18px;margin-bottom:18px;}.rep-meta>div{display:flex;flex-direction:column;}' +
+      '.rep-lbl{font-size:11px;color:#9aa0a6;text-transform:uppercase;letter-spacing:.4px;font-weight:600;}.rep-val{font-size:14px;color:#1f2937;font-weight:600;}' +
+      '.rep-vacio{font-size:13px;color:#9aa0a6;font-style:italic;}' +
+      '.rep-tabla{width:100%;border-collapse:collapse;}' +
+      '.rep-tabla th{text-align:left;font-size:11px;color:#fff;background:#1F3864;padding:8px;text-transform:uppercase;letter-spacing:.3px;user-select:none;}' +
+      '.rep-tabla th:hover{filter:brightness(1.15);}' +
+      '.rep-tabla td{font-size:13px;padding:7px 8px;border-bottom:1px solid #f0f2f4;vertical-align:top;}' +
+      '.rep-tabla tbody tr:nth-child(even){background:#f8fafc;}' +
+      '.ej-badge{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11px;font-weight:700;}' +
+      '.ej-venc{background:#fce8e6;color:#c5221f;}.ej-pend{background:#f1f3f4;color:#5f6368;}';
+    var html = '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Reporte Ejecutivo - ' + esc(rep.credito) + '</title><style>' + estilos + '</style></head><body>' + cuerpo + script + '</body></html>';
+    var blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var nombreArchivo = ('Reporte_Ejecutivo_' + rep.credito).replace(/[^\w\u00C0-\u017F]+/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '') + '.html';
+    var a = document.createElement('a');
+    a.href = url; a.download = nombreArchivo || 'Reporte_Ejecutivo.html';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1500);
+    toast('Reporte ejecutivo descargado.');
+  }
+  // =========================================================
+  //  FORMATOS INSTITUCIONALES
+  // =========================================================
+  var _fmtClienteId = '', _fmtPlantillas = [], _fmtCamposPend = null;
+
+  function fmtInicializar() {
+    var sel = document.getElementById('fmt-cliente');
+    var actual = sel.value; opcionesClientes('fmt-cliente'); if (actual) sel.value = actual;
+    google.script.run.withSuccessHandler(function (pls) {
+      _fmtPlantillas = pls || [];
+      var s = document.getElementById('fmt-plantilla');
+      s.innerHTML = _fmtPlantillas.length === 0
+        ? '<option value="">(Sin plantillas registradas)</option>'
+        : '<option value="">Selecciona…</option>' + _fmtPlantillas.map(function (p) { return '<option value="' + esc(p.id) + '">' + esc(p.nombre) + '</option>'; }).join('');
+    }).withFailureHandler(function (err) { toast('Error: ' + err.message, true); }).obtenerPlantillas();
+  }
+  function fmtSeleccionarCliente() {
+    _fmtClienteId = document.getElementById('fmt-cliente').value;
+    var selC = document.getElementById('fmt-credito');
+    selC.value = '';
+    if (!_fmtClienteId) { selC.disabled = true; selC.innerHTML = '<option value="">Selecciona un cliente primero…</option>'; return; }
+    selC.disabled = true; selC.innerHTML = '<option value="">Cargando…</option>';
+    google.script.run.withSuccessHandler(function (creditos) {
+      selC.innerHTML = '<option value="">(Sin crédito)</option>' + (creditos || []).map(function (c) { return '<option value="' + esc(c['ID']) + '">' + esc(c['Nombre del crédito']) + '</option>'; }).join('');
+      selC.disabled = false;
+    }).withFailureHandler(function (err) { selC.innerHTML = '<option value="">Error</option>'; toast('Error: ' + err.message, true); })
+      .obtenerCreditosPorCliente(_fmtClienteId, true);
+  }
+  function fmtAbrirDatosCliente() {
+    if (!_fmtClienteId) { toast('Selecciona un cliente primero.', true); return; }
+    google.script.run.withSuccessHandler(function (d) {
+      document.getElementById('dc-rfc').value = d['RFC'] || '';
+      document.getElementById('dc-direccion').value = d['Dirección'] || '';
+      document.getElementById('dc-replegal').value = d['Representante Legal'] || '';
+      document.getElementById('dc-telefono').value = d['Teléfono'] || '';
+      document.getElementById('dc-correo').value = d['Correo'] || '';
+      abrirModal('modal-datos-cliente');
+    }).withFailureHandler(function (err) { toast('Error: ' + err.message, true); }).obtenerDatosCliente(_fmtClienteId);
+  }
+  function fmtGuardarDatosCliente() {
+    var btn = document.getElementById('btn-guardar-dc');
+    btn.disabled = true; btn.textContent = 'Guardando…';
+    google.script.run.withSuccessHandler(function () {
+      btn.disabled = false; btn.textContent = 'Guardar';
+      cerrarModal('modal-datos-cliente'); toast('Datos del cliente guardados.');
+    }).withFailureHandler(function (err) { btn.disabled = false; btn.textContent = 'Guardar'; toast('Error: ' + err.message, true); })
+      .guardarDatosCliente(_fmtClienteId, {
+        'RFC': document.getElementById('dc-rfc').value.trim(),
+        'Dirección': document.getElementById('dc-direccion').value.trim(),
+        'Representante Legal': document.getElementById('dc-replegal').value.trim(),
+        'Teléfono': document.getElementById('dc-telefono').value.trim(),
+        'Correo': document.getElementById('dc-correo').value.trim()
+      });
+  }
+  function fmtGenerar() {
+    var idPl = document.getElementById('fmt-plantilla').value;
+    if (!_fmtClienteId) { toast('Selecciona un cliente.', true); return; }
+    if (!idPl) { toast('Selecciona un formato.', true); return; }
+    var btn = document.getElementById('btn-fmt-generar');
+    btn.disabled = true; btn.textContent = 'Preparando…';
+    google.script.run.withSuccessHandler(function (info) {
+      btn.disabled = false; btn.textContent = '📄 Generar PDF';
+      var idCred = document.getElementById('fmt-credito').value;
+      if (info.requiereCredito && !idCred) { toast('Este formato requiere seleccionar un crédito.', true); return; }
+      if (info.campos && info.campos.length > 0) {
+        _fmtCamposPend = info.campos;
+        document.getElementById('fmt-inputs-cuerpo').innerHTML = info.campos.map(function (c) {
+          return '<label>' + esc(c.etiqueta) + '<input type="text" id="fmtin-' + esc(c.clave) + '"></label>';
+        }).join('');
+        abrirModal('modal-fmt-inputs');
+      } else { _fmtCamposPend = []; fmtGenerarConInputs(); }
+    }).withFailureHandler(function (err) { btn.disabled = false; btn.textContent = '📄 Generar PDF'; toast('Error: ' + err.message, true); })
+      .obtenerCamposPlantilla(idPl);
+  }
+  function fmtGenerarConInputs() {
+    var inputs = {};
+    (_fmtCamposPend || []).forEach(function (c) {
+      var el = document.getElementById('fmtin-' + c.clave);
+      inputs[c.clave] = el ? el.value.trim() : '';
+    });
+    cerrarModal('modal-fmt-inputs');
+    var btn = document.getElementById('btn-fmt-generar');
+    btn.disabled = true; btn.textContent = 'Generando PDF…';
+    toast('Generando formato…');
+    google.script.run.withSuccessHandler(function (res) {
+      btn.disabled = false; btn.textContent = '📄 Generar PDF';
+      var bin = atob(res.base64), bytes = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      var blob = new Blob([bytes], { type: 'application/pdf' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url; a.download = res.nombre || 'Formato.pdf';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(function () { URL.revokeObjectURL(url); }, 1500);
+      toast('Formato descargado.');
+    }).withFailureHandler(function (err) { btn.disabled = false; btn.textContent = '📄 Generar PDF'; toast('Error: ' + err.message, true); })
+      .generarFormato(document.getElementById('fmt-plantilla').value, _fmtClienteId,
+        document.getElementById('fmt-credito').value || null, inputs);
+  }
+</script>

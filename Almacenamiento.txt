@@ -1,0 +1,39 @@
+const CONFIG_ALMACENAMIENTO = {
+  CARPETA_RAIZ_ID: '18nIiRg2CjIZDrSy9cEZ4uZXw3AIqYPfs'
+};
+
+
+function crearCarpetaSolicitud(idSolicitud) {
+
+  const carpetaRaiz = DriveApp.getFolderById(
+    CONFIG_ALMACENAMIENTO.CARPETA_RAIZ_ID
+  );
+
+  // Evitar crear dos carpetas para la misma solicitud
+  const existentes = carpetaRaiz.getFoldersByName(idSolicitud);
+
+  if (existentes.hasNext()) {
+    return existentes.next().getId();
+  }
+
+  // Crear carpeta principal de la solicitud
+  const carpetaSolicitud = carpetaRaiz.createFolder(idSolicitud);
+
+  // Crear estructura inicial
+  carpetaSolicitud.createFolder('KYC');
+  carpetaSolicitud.createFolder('Documentos');
+
+  return carpetaSolicitud.getId();
+}
+function probarAccesoDrive() {
+
+  const carpetaRaiz = DriveApp.getFolderById(
+    CONFIG_ALMACENAMIENTO.CARPETA_RAIZ_ID
+  );
+
+  Logger.log('Carpeta encontrada: ' + carpetaRaiz.getName());
+
+  const carpetaPrueba = carpetaRaiz.createFolder('PRUEBA_PERMISOS');
+
+  Logger.log('Carpeta creada correctamente: ' + carpetaPrueba.getId());
+}
